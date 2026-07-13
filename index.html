@@ -1,0 +1,1050 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BrettOS v1.0</title>
+<style>
+/* ── TOKENS ────────────────────────────────────────────────────────────────── */
+:root {
+  --bg:         #0f1117;
+  --surface:    #1a1d27;
+  --surface2:   #222636;
+  --border:     #2e3248;
+  --accent:     #4f8ef7;
+  --accent2:    #7c5cbf;
+  --green:      #3ecf8e;
+  --amber:      #f5a623;
+  --red:        #e05252;
+  --text:       #e8eaf0;
+  --muted:      #7b80a0;
+  --tag-bg:     #252840;
+
+  --venture-ridge:   #4f8ef7;
+  --venture-barrel:  #f5a623;
+  --venture-handyman:#3ecf8e;
+  --venture-cabin:   #9b59b6;
+  --venture-personal:#e05252;
+  --venture-multiple:#7b80a0;
+
+  --radius: 8px;
+  --radius-sm: 5px;
+  --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --mono: 'SF Mono', 'Fira Code', monospace;
+}
+
+/* ── RESET ─────────────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+button { cursor: pointer; border: none; font-family: inherit; }
+input, textarea, select {
+  font-family: inherit;
+  font-size: 14px;
+  background: var(--surface2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  outline: none;
+  width: 100%;
+}
+input:focus, textarea:focus, select:focus { border-color: var(--accent); }
+select option { background: var(--surface2); }
+textarea { resize: vertical; min-height: 80px; }
+a { color: var(--accent); text-decoration: none; }
+
+/* ── LAYOUT ─────────────────────────────────────────────────────────────────── */
+#app { display: flex; flex-direction: column; height: 100vh; }
+
+/* ── HEADER ─────────────────────────────────────────────────────────────────── */
+header {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 0 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 52px;
+  flex-shrink: 0;
+}
+.logo {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.logo span { font-weight: 300; }
+.version { font-size: 11px; color: var(--muted); margin-top: 2px; }
+header .spacer { flex: 1; }
+#quickCaptureBtn {
+  background: var(--accent);
+  color: #fff;
+  border-radius: var(--radius-sm);
+  padding: 7px 14px;
+  font-size: 13px;
+  font-weight: 600;
+}
+#quickCaptureBtn:hover { opacity: 0.9; }
+
+/* ── TABS ────────────────────────────────────────────────────────────────────── */
+nav {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  overflow-x: auto;
+  flex-shrink: 0;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+nav::-webkit-scrollbar { display: none; }
+.tab-btn {
+  background: none;
+  color: var(--muted);
+  padding: 0 16px;
+  height: 42px;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  border-bottom: 2px solid transparent;
+  transition: color 0.15s, border-color 0.15s;
+  flex-shrink: 0;
+}
+.tab-btn:hover { color: var(--text); }
+.tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+/* ── CONTENT ─────────────────────────────────────────────────────────────────── */
+main {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  -webkit-overflow-scrolling: touch;
+}
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
+/* ── SECTION TITLE ───────────────────────────────────────────────────────────── */
+.section-title {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 12px;
+}
+
+/* ── CARDS ───────────────────────────────────────────────────────────────────── */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px;
+  margin-bottom: 10px;
+}
+.card-title {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.card-meta {
+  font-size: 12px;
+  color: var(--muted);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+/* ── TAGS ────────────────────────────────────────────────────────────────────── */
+.tag {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 2px 7px;
+  border-radius: 20px;
+  background: var(--tag-bg);
+  color: var(--muted);
+}
+.tag.venture-ridge    { background: #1a2a3d; color: var(--venture-ridge); }
+.tag.venture-barrel   { background: #2e1f06; color: var(--venture-barrel); }
+.tag.venture-handyman { background: #0d2b1f; color: var(--venture-handyman); }
+.tag.venture-cabin    { background: #1e1030; color: var(--venture-cabin); }
+.tag.venture-personal { background: #2b0d0d; color: var(--venture-personal); }
+.tag.venture-multiple { background: var(--tag-bg); color: var(--muted); }
+
+.tag.priority-critical { background: #2b0d0d; color: var(--red); }
+.tag.priority-high     { background: #2b1a06; color: var(--amber); }
+.tag.priority-medium   { background: var(--tag-bg); color: var(--muted); }
+.tag.priority-low      { background: var(--tag-bg); color: var(--muted); }
+
+.tag.status-backlog    { background: var(--tag-bg); color: var(--muted); }
+.tag.status-next_up    { background: #0d1e2b; color: var(--accent); }
+.tag.status-in_progress{ background: #0d2b1f; color: var(--green); }
+.tag.status-waiting    { background: #2b1a06; color: var(--amber); }
+.tag.status-done       { background: var(--tag-bg); color: var(--muted); }
+
+/* ── FORMS ───────────────────────────────────────────────────────────────────── */
+.form-group { margin-bottom: 12px; }
+.form-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  margin-bottom: 5px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+@media (max-width: 480px) { .form-row { grid-template-columns: 1fr; } }
+
+/* ── BUTTONS ─────────────────────────────────────────────────────────────────── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 600;
+  transition: opacity 0.15s;
+}
+.btn:hover { opacity: 0.85; }
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+.btn-success { background: var(--green); color: #0d2b1f; }
+.btn-sm { padding: 5px 10px; font-size: 12px; }
+.btn-full { width: 100%; }
+
+/* ── TOGGLE ──────────────────────────────────────────────────────────────────── */
+.type-toggle {
+  display: flex;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  margin-bottom: 14px;
+}
+.type-toggle button {
+  flex: 1;
+  padding: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--muted);
+  background: none;
+  transition: background 0.15s, color 0.15s;
+}
+.type-toggle button.active {
+  background: var(--accent);
+  color: #fff;
+}
+
+/* ── FILTER BAR ──────────────────────────────────────────────────────────────── */
+.filter-bar {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.filter-bar select {
+  width: auto;
+  font-size: 12px;
+  padding: 6px 8px;
+}
+
+/* ── EMPTY STATE ─────────────────────────────────────────────────────────────── */
+.empty {
+  text-align: center;
+  padding: 48px 16px;
+  color: var(--muted);
+}
+.empty-icon { font-size: 36px; margin-bottom: 10px; }
+.empty h3 { font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 6px; }
+.empty p { font-size: 13px; }
+
+/* ── TOAST ───────────────────────────────────────────────────────────────────── */
+#toast {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%) translateY(80px);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 20px;
+  font-size: 13px;
+  font-weight: 500;
+  z-index: 1000;
+  transition: transform 0.25s ease;
+  white-space: nowrap;
+}
+#toast.show { transform: translateX(-50%) translateY(0); }
+#toast.success { border-color: var(--green); color: var(--green); }
+#toast.error   { border-color: var(--red);   color: var(--red);   }
+
+/* ── MODAL ───────────────────────────────────────────────────────────────────── */
+.modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  z-index: 500;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 0;
+}
+.modal-overlay.open { display: flex; }
+.modal {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius) var(--radius) 0 0;
+  padding: 20px 16px;
+  width: 100%;
+  max-width: 560px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+@media (min-width: 600px) {
+  .modal-overlay { align-items: center; padding: 16px; }
+  .modal { border-radius: var(--radius); }
+}
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+.modal-title { font-size: 16px; font-weight: 700; }
+.modal-close {
+  background: none;
+  color: var(--muted);
+  font-size: 20px;
+  padding: 4px 8px;
+}
+
+/* ── PATTERN CARD ────────────────────────────────────────────────────────────── */
+.pattern-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent2);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  margin-bottom: 8px;
+}
+.pattern-id { font-size: 11px; color: var(--accent2); font-family: var(--mono); font-weight: 600; }
+.pattern-text { font-size: 13px; margin: 4px 0; }
+.pattern-meta { font-size: 11px; color: var(--muted); display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+
+/* ── WBM CARD ────────────────────────────────────────────────────────────────── */
+.wbm-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--amber);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  margin-bottom: 8px;
+}
+.wbm-id { font-size: 11px; color: var(--amber); font-family: var(--mono); font-weight: 600; }
+
+/* ── LOADING ─────────────────────────────────────────────────────────────────── */
+.spinner {
+  width: 20px; height: 20px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  display: inline-block;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading-row {
+  display: flex; align-items: center; gap: 10px;
+  color: var(--muted); font-size: 13px; padding: 20px 0;
+}
+
+/* ── VENTURE DOT ─────────────────────────────────────────────────────────────── */
+.v-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+.v-dot.ridge    { background: var(--venture-ridge); }
+.v-dot.barrel   { background: var(--venture-barrel); }
+.v-dot.handyman { background: var(--venture-handyman); }
+.v-dot.cabin    { background: var(--venture-cabin); }
+.v-dot.personal { background: var(--venture-personal); }
+.v-dot.multiple { background: var(--muted); }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- HEADER -->
+  <header>
+    <div>
+      <div class="logo">Brett<span>OS</span></div>
+      <div class="version">v1.0 · Phase 1</div>
+    </div>
+    <div class="spacer"></div>
+    <button id="quickCaptureBtn" onclick="openCapture()">+ Capture</button>
+  </header>
+
+  <!-- NAV TABS -->
+  <nav>
+    <button class="tab-btn active" onclick="showTab('capture', this)">📥 Capture</button>
+    <button class="tab-btn" onclick="showTab('tasks', this)">✅ Tasks</button>
+    <button class="tab-btn" onclick="showTab('wbm', this)">⚡ What Bugs Me</button>
+    <button class="tab-btn" onclick="showTab('patterns', this)">🧠 Patterns</button>
+    <button class="tab-btn" onclick="showTab('devlog', this)">📋 Dev Log</button>
+  </nav>
+
+  <!-- MAIN CONTENT -->
+  <main>
+
+    <!-- ── CAPTURE TAB ──────────────────────────────────────────────────────── -->
+    <div id="tab-capture" class="tab-panel active">
+      <p class="section-title">Quick Capture</p>
+
+      <!-- Type toggle -->
+      <div class="type-toggle">
+        <button id="typeWBM" class="active" onclick="setType('wbm')">⚡ What Bugs Me</button>
+        <button id="typeTask" onclick="setType('task')">✅ Task</button>
+      </div>
+
+      <!-- Main text input -->
+      <div class="form-group">
+        <label class="form-label" id="captureLabel">What bugs you?</label>
+        <textarea id="captureText" placeholder="Describe it exactly as it comes to mind..." rows="3"></textarea>
+      </div>
+
+      <!-- Voice to text -->
+      <div class="form-group">
+        <button class="btn btn-secondary btn-sm" id="voiceBtn" onclick="toggleVoice()">🎤 Voice Input</button>
+        <span id="voiceStatus" style="font-size:12px;color:var(--muted);margin-left:8px;"></span>
+      </div>
+
+      <!-- Context fields (collapsible) -->
+      <details style="margin-bottom:14px;">
+        <summary style="cursor:pointer;font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;user-select:none;">
+          + Add Context (optional)
+        </summary>
+        <div style="margin-top:12px;">
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Venture</label>
+              <select id="captureVenture">
+                <option value="">— select —</option>
+                <option value="ridge_co">Ridge Co</option>
+                <option value="barrel_co">BarrelCo</option>
+                <option value="handyman">Handyman</option>
+                <option value="cabin">WV Cabin</option>
+                <option value="personal">Personal</option>
+                <option value="multiple">Multiple</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Location</label>
+              <select id="captureLocation">
+                <option value="">— anywhere —</option>
+                <option value="baltimore">Baltimore</option>
+                <option value="waynesboro">Waynesboro</option>
+                <option value="wv_cabin">WV Cabin</option>
+                <option value="office">Office</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-row" id="taskExtraFields" style="display:none;">
+            <div class="form-group">
+              <label class="form-label">Context</label>
+              <select id="captureContext">
+                <option value="">— select —</option>
+                <option value="quick_hit">Quick hit</option>
+                <option value="deep_focus">Deep focus</option>
+                <option value="errand">Errand</option>
+                <option value="phone_call">Phone call</option>
+                <option value="waiting_on_someone">Waiting on someone</option>
+                <option value="planning">Planning</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Device</label>
+              <select id="captureDevice">
+                <option value="any">Any device</option>
+                <option value="phone_ok">Phone OK</option>
+                <option value="desktop_only">Desktop only</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-row" id="taskPriorityFields" style="display:none;">
+            <div class="form-group">
+              <label class="form-label">Priority</label>
+              <select id="capturePriority">
+                <option value="medium">Medium</option>
+                <option value="critical">Critical</option>
+                <option value="high">High</option>
+                <option value="low">Low</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Energy needed</label>
+              <select id="captureEnergy">
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+                <option value="low">Low</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </details>
+
+      <!-- Submit -->
+      <button class="btn btn-primary btn-full" id="captureSubmitBtn" onclick="submitCapture()">
+        Save
+      </button>
+
+      <!-- Bulk paste section -->
+      <div style="margin-top:28px;">
+        <p class="section-title">Bulk Paste</p>
+        <p style="font-size:12px;color:var(--muted);margin-bottom:10px;">
+          Paste multiple items — one per line. All will be saved as WBMs for AI batch processing.
+        </p>
+        <div class="form-group">
+          <textarea id="bulkText" placeholder="Paste items here, one per line..." rows="6"></textarea>
+        </div>
+        <div class="form-row">
+          <select id="bulkVenture">
+            <option value="">— venture (all) —</option>
+            <option value="ridge_co">Ridge Co</option>
+            <option value="barrel_co">BarrelCo</option>
+            <option value="handyman">Handyman</option>
+            <option value="cabin">WV Cabin</option>
+            <option value="personal">Personal</option>
+            <option value="multiple">Multiple</option>
+          </select>
+          <button class="btn btn-secondary" onclick="submitBulk()">Save All as WBMs</button>
+        </div>
+        <div id="bulkProgress" style="margin-top:10px;font-size:12px;color:var(--muted);"></div>
+      </div>
+    </div>
+
+    <!-- ── TASKS TAB ────────────────────────────────────────────────────────── -->
+    <div id="tab-tasks" class="tab-panel">
+      <p class="section-title">Tasks</p>
+
+      <!-- Filters -->
+      <div class="filter-bar">
+        <select id="filterVenture" onchange="loadTasks()">
+          <option value="">All ventures</option>
+          <option value="ridge_co">Ridge Co</option>
+          <option value="barrel_co">BarrelCo</option>
+          <option value="handyman">Handyman</option>
+          <option value="cabin">WV Cabin</option>
+          <option value="personal">Personal</option>
+          <option value="multiple">Multiple</option>
+        </select>
+        <select id="filterStatus" onchange="loadTasks()">
+          <option value="">All statuses</option>
+          <option value="backlog">Backlog</option>
+          <option value="next_up">Next up</option>
+          <option value="in_progress">In progress</option>
+          <option value="waiting">Waiting</option>
+          <option value="done">Done</option>
+        </select>
+        <select id="filterDevice" onchange="loadTasks()">
+          <option value="">Any device</option>
+          <option value="phone_ok">Phone OK</option>
+          <option value="desktop_only">Desktop only</option>
+        </select>
+        <select id="filterPriority" onchange="loadTasks()">
+          <option value="">All priorities</option>
+          <option value="critical">Critical</option>
+          <option value="high">High</option>
+          <option value="medium">Medium</option>
+          <option value="low">Low</option>
+        </select>
+        <button class="btn btn-secondary btn-sm" onclick="loadTasks()">↻ Refresh</button>
+      </div>
+
+      <div id="tasksList"></div>
+    </div>
+
+    <!-- ── WBM TAB ──────────────────────────────────────────────────────────── -->
+    <div id="tab-wbm" class="tab-panel">
+      <p class="section-title">What Bugs Me</p>
+
+      <div class="filter-bar">
+        <select id="filterWBMStatus" onchange="loadWBM()">
+          <option value="raw">Unprocessed</option>
+          <option value="">All</option>
+          <option value="processed">Processed</option>
+          <option value="converted">Converted to task</option>
+          <option value="dismissed">Dismissed</option>
+        </select>
+        <button class="btn btn-secondary btn-sm" onclick="loadWBM()">↻ Refresh</button>
+      </div>
+
+      <div id="wbmList"></div>
+    </div>
+
+    <!-- ── PATTERNS TAB ─────────────────────────────────────────────────────── -->
+    <div id="tab-patterns" class="tab-panel">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+        <p class="section-title" style="margin:0;">Patterns</p>
+        <button class="btn btn-secondary btn-sm" onclick="loadPatterns()">↻ Refresh</button>
+      </div>
+      <p style="font-size:12px;color:var(--muted);margin-bottom:14px;">
+        Confirmed patterns are injected into every AI batch call. They represent things you always want applied to new projects and tasks.
+      </p>
+      <div id="patternsList"></div>
+    </div>
+
+    <!-- ── DEV LOG TAB ──────────────────────────────────────────────────────── -->
+    <div id="tab-devlog" class="tab-panel">
+      <p class="section-title">Dev Log — BrettOS Wishlist</p>
+
+      <div class="form-group" style="display:flex;gap:8px;">
+        <input type="text" id="devlogText" placeholder="Feature idea or bug..." style="flex:1;">
+        <button class="btn btn-primary" style="white-space:nowrap;" onclick="addDevLog()">Add</button>
+      </div>
+
+      <div id="devlogList"></div>
+    </div>
+
+  </main>
+</div>
+
+<!-- ── QUICK CAPTURE MODAL ──────────────────────────────────────────────────── -->
+<div class="modal-overlay" id="captureModal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">Quick Capture</span>
+      <button class="modal-close" onclick="closeCapture()">✕</button>
+    </div>
+    <div class="type-toggle">
+      <button id="modalTypeWBM" class="active" onclick="setModalType('wbm')">⚡ What Bugs Me</button>
+      <button id="modalTypeTask" onclick="setModalType('task')">✅ Task</button>
+    </div>
+    <div class="form-group">
+      <textarea id="modalText" placeholder="Capture it fast..." rows="3" autofocus></textarea>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Venture</label>
+        <select id="modalVenture">
+          <option value="">— select —</option>
+          <option value="ridge_co">Ridge Co</option>
+          <option value="barrel_co">BarrelCo</option>
+          <option value="handyman">Handyman</option>
+          <option value="cabin">WV Cabin</option>
+          <option value="personal">Personal</option>
+          <option value="multiple">Multiple</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Priority</label>
+        <select id="modalPriority">
+          <option value="medium">Medium</option>
+          <option value="critical">Critical</option>
+          <option value="high">High</option>
+          <option value="low">Low</option>
+        </select>
+      </div>
+    </div>
+    <button class="btn btn-primary btn-full" onclick="submitModal()">Save</button>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div id="toast"></div>
+
+<script>
+// ── CONFIG ────────────────────────────────────────────────────────────────────
+const WORKER = 'https://brett-os.brett-2f8.workers.dev';
+const SECRET = 'brett-os-secret-2026-brett'; // move to prompt/env once Worker exists
+
+// ── STATE ─────────────────────────────────────────────────────────────────────
+let captureType = 'wbm';
+let modalType   = 'wbm';
+let recognition = null;
+let voiceActive = false;
+
+// ── TABS ──────────────────────────────────────────────────────────────────────
+function showTab(name, btn) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  btn.classList.add('active');
+  if (name === 'tasks')    loadTasks();
+  if (name === 'wbm')      loadWBM();
+  if (name === 'patterns') loadPatterns();
+  if (name === 'devlog')   loadDevLog();
+}
+
+// ── TYPE TOGGLE ───────────────────────────────────────────────────────────────
+function setType(type) {
+  captureType = type;
+  document.getElementById('typeWBM').classList.toggle('active', type === 'wbm');
+  document.getElementById('typeTask').classList.toggle('active', type === 'task');
+  document.getElementById('captureLabel').textContent =
+    type === 'wbm' ? 'What bugs you?' : 'What needs to get done?';
+  document.getElementById('taskExtraFields').style.display  = type === 'task' ? 'grid' : 'none';
+  document.getElementById('taskPriorityFields').style.display = type === 'task' ? 'grid' : 'none';
+}
+
+function setModalType(type) {
+  modalType = type;
+  document.getElementById('modalTypeWBM').classList.toggle('active', type === 'wbm');
+  document.getElementById('modalTypeTask').classList.toggle('active', type === 'task');
+}
+
+// ── MODAL ─────────────────────────────────────────────────────────────────────
+function openCapture() {
+  document.getElementById('captureModal').classList.add('open');
+  setTimeout(() => document.getElementById('modalText').focus(), 100);
+}
+function closeCapture() {
+  document.getElementById('captureModal').classList.remove('open');
+  document.getElementById('modalText').value = '';
+}
+
+async function submitModal() {
+  const text = document.getElementById('modalText').value.trim();
+  if (!text) { toast('Enter something first', 'error'); return; }
+  const btn = document.querySelector('#captureModal .btn-primary');
+  btn.textContent = 'Saving...'; btn.disabled = true;
+  try {
+    await api('/capture', {
+      type:    modalType,
+      text,
+      venture: document.getElementById('modalVenture').value,
+      priority:document.getElementById('modalPriority').value,
+      source:  'web_ui'
+    });
+    toast(modalType === 'wbm' ? 'WBM captured ⚡' : 'Task saved ✅', 'success');
+    closeCapture();
+  } catch(e) {
+    toast('Save failed: ' + e.message, 'error');
+  } finally {
+    btn.textContent = 'Save'; btn.disabled = false;
+  }
+}
+
+// ── CAPTURE SUBMIT ────────────────────────────────────────────────────────────
+async function submitCapture() {
+  const text = document.getElementById('captureText').value.trim();
+  if (!text) { toast('Enter something first', 'error'); return; }
+  const btn = document.getElementById('captureSubmitBtn');
+  btn.textContent = 'Saving...'; btn.disabled = true;
+  try {
+    await api('/capture', {
+      type:     captureType,
+      text,
+      venture:  document.getElementById('captureVenture').value,
+      location: document.getElementById('captureLocation').value,
+      context:  document.getElementById('captureContext').value,
+      device:   document.getElementById('captureDevice').value,
+      priority: document.getElementById('capturePriority') ? document.getElementById('capturePriority').value : 'medium',
+      energy:   document.getElementById('captureEnergy') ? document.getElementById('captureEnergy').value : 'medium',
+      source:   'web_ui'
+    });
+    toast(captureType === 'wbm' ? 'WBM captured ⚡' : 'Task saved ✅', 'success');
+    document.getElementById('captureText').value = '';
+  } catch(e) {
+    toast('Save failed: ' + e.message, 'error');
+  } finally {
+    btn.textContent = 'Save'; btn.disabled = false;
+  }
+}
+
+// ── BULK PASTE ────────────────────────────────────────────────────────────────
+async function submitBulk() {
+  const raw = document.getElementById('bulkText').value.trim();
+  if (!raw) { toast('Paste something first', 'error'); return; }
+  const venture = document.getElementById('bulkVenture').value;
+  const lines = raw.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+  if (lines.length === 0) { toast('No items found', 'error'); return; }
+
+  const prog = document.getElementById('bulkProgress');
+  prog.textContent = `Saving 0 of ${lines.length}...`;
+
+  let saved = 0;
+  for (const line of lines) {
+    try {
+      await api('/capture', { type: 'wbm', text: line, venture, source: 'bulk_paste' });
+      saved++;
+      prog.textContent = `Saving ${saved} of ${lines.length}...`;
+    } catch(e) {
+      console.error('Failed to save:', line, e);
+    }
+    await sleep(200); // gentle pacing
+  }
+
+  prog.textContent = `✅ Saved ${saved} of ${lines.length} items`;
+  if (saved === lines.length) document.getElementById('bulkText').value = '';
+  toast(`${saved} WBMs saved`, 'success');
+}
+
+// ── LOAD TASKS ────────────────────────────────────────────────────────────────
+async function loadTasks() {
+  const el = document.getElementById('tasksList');
+  el.innerHTML = '<div class="loading-row"><div class="spinner"></div> Loading tasks...</div>';
+  try {
+    const params = new URLSearchParams();
+    const v = document.getElementById('filterVenture').value;
+    const s = document.getElementById('filterStatus').value;
+    const d = document.getElementById('filterDevice').value;
+    const p = document.getElementById('filterPriority').value;
+    if (v) params.set('venture', v);
+    if (s) params.set('status', s);
+    if (d) params.set('device', d);
+    if (p) params.set('priority', p);
+
+    const data = await api('/tasks?' + params.toString(), null, 'GET');
+    const tasks = data.tasks || [];
+
+    if (tasks.length === 0) {
+      el.innerHTML = `<div class="empty"><div class="empty-icon">✅</div><h3>No tasks yet</h3><p>Capture your first task using the Capture tab.</p></div>`;
+      return;
+    }
+
+    el.innerHTML = tasks.map(t => `
+      <div class="card">
+        <div style="display:flex;align-items:flex-start;gap:8px;">
+          <div class="v-dot ${t.Venture || 'multiple'}" style="margin-top:5px;"></div>
+          <div style="flex:1;min-width:0;">
+            <div class="card-title">${esc(t.Title)}</div>
+            ${t.Next_Action ? `<div style="font-size:12px;color:var(--accent);margin-top:3px;">→ ${esc(t.Next_Action)}</div>` : ''}
+            <div class="card-meta">
+              <span class="tag status-${t.Status}">${fmtStatus(t.Status)}</span>
+              ${t.Priority && t.Priority !== 'medium' ? `<span class="tag priority-${t.Priority}">${t.Priority}</span>` : ''}
+              ${t.Venture ? `<span class="tag venture-${t.Venture}">${fmtVenture(t.Venture)}</span>` : ''}
+              ${t.Device && t.Device !== 'any' ? `<span class="tag">${t.Device === 'phone_ok' ? '📱 Phone OK' : '🖥 Desktop'}</span>` : ''}
+              ${t.Context ? `<span class="tag">${fmtContext(t.Context)}</span>` : ''}
+              <span style="margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--muted);">${t.Task_ID}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    `).join('');
+  } catch(e) {
+    el.innerHTML = `<div class="empty"><div class="empty-icon">⚠️</div><h3>Couldn't load tasks</h3><p>${esc(e.message)}</p></div>`;
+  }
+}
+
+// ── LOAD WBM ──────────────────────────────────────────────────────────────────
+async function loadWBM() {
+  const el = document.getElementById('wbmList');
+  el.innerHTML = '<div class="loading-row"><div class="spinner"></div> Loading...</div>';
+  try {
+    const status = document.getElementById('filterWBMStatus').value;
+    const params = status ? '?status=' + status : '';
+    const data = await api('/wbm' + params, null, 'GET');
+    const items = data.wbm || [];
+
+    if (items.length === 0) {
+      el.innerHTML = `<div class="empty"><div class="empty-icon">⚡</div><h3>Nothing here</h3><p>Capture something that bugs you.</p></div>`;
+      return;
+    }
+
+    el.innerHTML = items.map(w => `
+      <div class="wbm-card">
+        <div class="wbm-id">${esc(w.WBM_ID)} · ${esc(w.Capture_Date)}</div>
+        <div style="font-size:13px;margin:5px 0;">${esc(w.Text)}</div>
+        <div class="card-meta">
+          ${w.Venture ? `<span class="tag venture-${w.Venture}">${fmtVenture(w.Venture)}</span>` : ''}
+          ${w.Location ? `<span class="tag">📍 ${esc(w.Location)}</span>` : ''}
+          <span class="tag">${esc(w.Status || 'raw')}</span>
+          <span class="tag">${esc(w.Capture_Method || 'web_ui')}</span>
+        </div>
+      </div>
+    `).join('');
+  } catch(e) {
+    el.innerHTML = `<div class="empty"><div class="empty-icon">⚠️</div><h3>Couldn't load WBMs</h3><p>${esc(e.message)}</p></div>`;
+  }
+}
+
+// ── LOAD PATTERNS ─────────────────────────────────────────────────────────────
+async function loadPatterns() {
+  const el = document.getElementById('patternsList');
+  el.innerHTML = '<div class="loading-row"><div class="spinner"></div> Loading...</div>';
+  try {
+    const data = await api('/patterns', null, 'GET');
+    const items = data.patterns || [];
+
+    if (items.length === 0) {
+      el.innerHTML = `<div class="empty"><div class="empty-icon">🧠</div><h3>No patterns yet</h3><p>Patterns emerge as you capture WBMs and tasks over time.</p></div>`;
+      return;
+    }
+
+    el.innerHTML = items.map(p => `
+      <div class="pattern-card">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span class="pattern-id">${esc(p.Pattern_ID)}</span>
+          <span class="tag">${esc(p.Category)}</span>
+          <span class="tag" style="margin-left:auto;">${esc(p.Confidence)}</span>
+        </div>
+        <div class="pattern-text">${esc(p.Pattern_Text)}</div>
+        <div class="pattern-meta">
+          <span>First seen: ${esc(p.First_Seen)}</span>
+          ${p.Applied_To ? `<span>Applied to: ${esc(p.Applied_To)}</span>` : ''}
+        </div>
+      </div>
+    `).join('');
+  } catch(e) {
+    el.innerHTML = `<div class="empty"><div class="empty-icon">⚠️</div><h3>Couldn't load patterns</h3><p>${esc(e.message)}</p></div>`;
+  }
+}
+
+// ── DEV LOG ───────────────────────────────────────────────────────────────────
+async function loadDevLog() {
+  const el = document.getElementById('devlogList');
+  el.innerHTML = '<div class="loading-row"><div class="spinner"></div> Loading...</div>';
+  try {
+    const data = await api('/devlog', null, 'GET');
+    const items = data.devlog || [];
+    if (items.length === 0) {
+      el.innerHTML = `<div class="empty"><div class="empty-icon">📋</div><h3>Dev log is empty</h3><p>Add feature ideas or bugs above.</p></div>`;
+      return;
+    }
+    el.innerHTML = items.map(d => `
+      <div class="card" style="display:flex;align-items:center;gap:10px;">
+        <div style="flex:1;">
+          <div class="card-title" style="font-size:13px;">${esc(d.Text)}</div>
+          <div class="card-meta"><span class="tag status-${d.Status === 'wishlist' ? 'backlog' : d.Status === 'planned' ? 'next_up' : 'in_progress'}">${esc(d.Status)}</span><span>${esc(d.Created)}</span></div>
+        </div>
+        <span style="font-family:var(--mono);font-size:11px;color:var(--muted);">${esc(d.ID)}</span>
+      </div>
+    `).join('');
+  } catch(e) {
+    el.innerHTML = `<div class="empty"><div class="empty-icon">⚠️</div><h3>Couldn't load dev log</h3><p>${esc(e.message)}</p></div>`;
+  }
+}
+
+async function addDevLog() {
+  const input = document.getElementById('devlogText');
+  const text = input.value.trim();
+  if (!text) return;
+  try {
+    await api('/devlog', { text });
+    toast('Added to dev log', 'success');
+    input.value = '';
+    loadDevLog();
+  } catch(e) {
+    toast('Failed: ' + e.message, 'error');
+  }
+}
+
+// ── VOICE INPUT ───────────────────────────────────────────────────────────────
+function toggleVoice() {
+  if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+    toast('Voice not supported in this browser', 'error'); return;
+  }
+  if (voiceActive) {
+    recognition && recognition.stop();
+    voiceActive = false;
+    document.getElementById('voiceBtn').textContent = '🎤 Voice Input';
+    document.getElementById('voiceStatus').textContent = '';
+    return;
+  }
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  recognition = new SR();
+  recognition.lang = 'en-US';
+  recognition.continuous = false;
+  recognition.interimResults = true;
+  recognition.onresult = e => {
+    let interim = '', final = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      if (e.results[i].isFinal) final += e.results[i][0].transcript;
+      else interim += e.results[i][0].transcript;
+    }
+    const existing = document.getElementById('captureText').value;
+    document.getElementById('captureText').value = existing + (final || interim);
+    if (final) document.getElementById('voiceStatus').textContent = '✓ Got it';
+  };
+  recognition.onerror = e => {
+    toast('Voice error: ' + e.error, 'error');
+    voiceActive = false;
+    document.getElementById('voiceBtn').textContent = '🎤 Voice Input';
+  };
+  recognition.onend = () => {
+    voiceActive = false;
+    document.getElementById('voiceBtn').textContent = '🎤 Voice Input';
+    document.getElementById('voiceStatus').textContent = '';
+  };
+  recognition.start();
+  voiceActive = true;
+  document.getElementById('voiceBtn').textContent = '⏹ Stop';
+  document.getElementById('voiceStatus').textContent = 'Listening...';
+}
+
+// ── API ───────────────────────────────────────────────────────────────────────
+async function api(path, body = null, method = 'POST') {
+  const opts = {
+    method: body ? 'POST' : method,
+    headers: { 'Content-Type': 'application/json', 'X-Secret': SECRET },
+  };
+  if (body) opts.body = JSON.stringify(body);
+  const res = await fetch(WORKER + path, opts);
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Request failed');
+  return data;
+}
+
+// ── HELPERS ───────────────────────────────────────────────────────────────────
+function toast(msg, type = '') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'show ' + type;
+  setTimeout(() => { el.className = ''; }, 3000);
+}
+
+function esc(str) {
+  return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+function fmtStatus(s) {
+  return { backlog:'Backlog', next_up:'Next up', in_progress:'In progress',
+           waiting:'Waiting', done:'Done', cancelled:'Cancelled' }[s] || s;
+}
+
+function fmtVenture(v) {
+  return { ridge_co:'Ridge Co', barrel_co:'BarrelCo', handyman:'Handyman',
+           cabin:'WV Cabin', personal:'Personal', multiple:'Multiple' }[v] || v;
+}
+
+function fmtContext(c) {
+  return { quick_hit:'Quick hit', deep_focus:'Deep focus', errand:'Errand',
+           phone_call:'Phone call', waiting_on_someone:'Waiting', planning:'Planning' }[c] || c;
+}
+
+// ── KEYBOARD SHORTCUT ─────────────────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  if ((e.metaKey || e.ctrlKey) && e.key === 'k') { e.preventDefault(); openCapture(); }
+  if (e.key === 'Escape') closeCapture();
+  if (e.key === 'Enter' && e.target === document.getElementById('modalText') && (e.metaKey || e.ctrlKey)) {
+    submitModal();
+  }
+});
+
+// Close modal on overlay click
+document.getElementById('captureModal').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closeCapture();
+});
+</script>
+</body>
+</html>
