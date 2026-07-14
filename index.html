@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>BrettOS v3.0</title>
+<title>BrettOS v4.0</title>
 <style>
 /* ── TOKENS ────────────────────────────────────────────────────────────────── */
 :root {
@@ -592,7 +592,7 @@ main {
   <header>
     <div>
       <div class="logo">Brett<span>OS</span></div>
-      <div class="version">v3.0 · Phase 3</div>
+      <div class="version">v4.0 · Phase 4</div>
     </div>
     <div class="spacer"></div>
     <button id="quickCaptureBtn" onclick="openCapture()">+ Capture</button>
@@ -643,6 +643,10 @@ main {
           <div class="form-group">
             <label class="form-label">Venture(s)</label>
             <div class="chip-group" id="captureVentureChips"></div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Project(s) <span style="font-weight:400;text-transform:none;">(optional)</span></label>
+            <div class="chip-group" id="captureProjectChips"></div>
           </div>
           <div class="form-row">
             <div class="form-group">
@@ -794,6 +798,12 @@ main {
         <button class="btn btn-secondary btn-sm" onclick="loadWBM()">↻ Refresh</button>
       </div>
 
+      <!-- Bulk-apply bar (appears when 1+ WBM entries are checked) -->
+      <div id="wbmBulkBar" class="batch-insights" style="display:none;align-items:center;display:flex;gap:10px;">
+        <span id="wbmBulkCount"></span>
+        <button class="btn btn-primary btn-sm" style="margin-left:auto;" onclick="openWBMBulkModal()">🏷️ Apply Venture/Project →</button>
+      </div>
+
       <div id="wbmList"></div>
     </div>
 
@@ -804,12 +814,160 @@ main {
         <button class="btn btn-secondary btn-sm" onclick="loadPatterns()">↻ Refresh</button>
       </div>
       <p style="font-size:12px;color:var(--muted);margin-bottom:14px;">
-        Confirmed patterns are injected into every AI batch call. They represent things you always want applied to new projects and tasks.
+        Confirmed patterns are injected into every AI batch call. Suggested patterns come from AI-detected clusters and need your review.
       </p>
+
+      <!-- Manual entry -->
+      <div class="card" style="margin-bottom:16px;">
+        <p class="section-title" style="margin-bottom:10px;">Add Pattern Manually</p>
+        <div class="form-row">
+          <div class="form-group">
+            <input type="text" id="newPatternText" placeholder="e.g. Always include a lockbox code in vendor SMS">
+          </div>
+          <div class="form-group">
+            <select id="newPatternCategory">
+              <option value="system_design">System design</option>
+              <option value="workflow">Workflow</option>
+              <option value="communication">Communication</option>
+              <option value="tooling">Tooling</option>
+              <option value="personal">Personal</option>
+              <option value="business">Business</option>
+            </select>
+          </div>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="addManualPattern()">+ Add Pattern</button>
+      </div>
+
       <div id="patternsList"></div>
     </div>
 
-    <!-- ── BATCH AI TAB ─────────────────────────────────────────────────────── -->\n    <div id="tab-batch" class="tab-panel">\n\n      <!-- State: READY (no items loaded yet) -->\n      <div id="batchReady">\n        <p class="section-title">AI Batch Processor</p>\n        <p style="font-size:13px;color:var(--muted);margin-bottom:20px;">\n          Paste items below or route from the Capture tab. One API call processes everything at once.\n        </p>\n        <div class="form-group">\n          <label class="form-label">Items to process (one per line)</label>\n          <textarea id="batchInput" placeholder="Fix barrel pricing strategy&#10;Call lockbox vendor&#10;Update Ridge Co SMS template&#10;Schedule WV cabin deep clean" rows="8"></textarea>\n        </div>\n        <div class="form-row" style="margin-bottom:12px;">\n          <div class="form-group">\n            <label class="form-label">Default Venture</label>\n            <select id="batchVenture">\n              <option value="">— mixed / let AI decide —</option>\n              <option value="ridge_co">Ridge Co</option>\n              <option value="barrel_co">BarrelCo</option>\n              <option value="handyman">Handyman</option>\n              <option value="cabin">WV Cabin</option>\n              <option value="personal">Personal</option>\n            </select>\n          </div>\n          <div class="form-group">\n            <label class="form-label">Treat items as</label>\n            <select id="batchDefaultType">\n              <option value="wbm">WBMs (What Bugs Me)</option>\n              <option value="task">Tasks</option>\n              <option value="auto">Auto-detect</option>\n            </select>\n          </div>\n        </div>\n        <button class="btn btn-primary btn-full" id="batchRunBtn" onclick="runBatch()">\n          🤖 Run AI Batch\n        </button>\n        <p style="font-size:11px;color:var(--muted);margin-top:8px;text-align:center;">\n          Single API call · Tags all items · Detects patterns\n        </p>\n      </div>\n\n      <!-- State: PROCESSING -->\n      <div id="batchProcessing" style="display:none;">\n        <div class="loading-row" style="justify-content:center;padding:48px 0;flex-direction:column;gap:16px;">\n          <div class="spinner" style="width:32px;height:32px;border-width:3px;"></div>\n          <div style="text-align:center;">\n            <div style="font-size:15px;font-weight:600;" id="batchProcessingMsg">Processing items...</div>\n            <div style="font-size:12px;color:var(--muted);margin-top:4px;" id="batchProcessingCount"></div>\n          </div>\n        </div>\n      </div>\n\n      <!-- State: REVIEW -->\n      <div id="batchReview" style="display:none;">\n\n        <!-- AI Log strip -->\n        <div class="ai-log-strip" id="batchAiLogStrip"></div>\n\n        <!-- Batch insights -->\n        <div class="batch-insights" id="batchInsightsBox" style="display:none;">\n          <div class="batch-insights-title">🧠 Batch Insights</div>\n          <div id="batchInsightsContent"></div>\n        </div>\n\n        <!-- Mode toggle -->\n        <div class="batch-mode-bar">\n          <button id="modeTableBtn" class="active" onclick="setBatchMode('table')">📊 Table</button>\n          <button id="modeCardBtn"  onclick="setBatchMode('card')">🃏 Card</button>\n          <button id="modeDiffBtn"  onclick="setBatchMode('diff')">↔ Diff</button>\n        </div>\n\n        <!-- TABLE MODE -->\n        <div id="batchTableMode">\n          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">\n            <button class="btn btn-secondary btn-sm" onclick="selectAllBatch(true)">Select All</button>\n            <button class="btn btn-secondary btn-sm" onclick="selectAllBatch(false)">Deselect All</button>\n            <span style="font-size:12px;color:var(--muted);margin-left:auto;" id="tableSelCount"></span>\n          </div>\n          <div class="table-scroll">\n            <table class="batch-table" id="batchTable">\n              <thead>\n                <tr>\n                  <th class="row-check"><input type="checkbox" id="tableCheckAll" onchange="selectAllBatch(this.checked)"></th>\n                  <th>Title</th>\n                  <th>Type</th>\n                  <th>Venture</th>\n                  <th>Priority</th>\n                  <th>Context</th>\n                  <th>Tags</th>\n                </tr>\n              </thead>\n              <tbody id="batchTableBody"></tbody>\n            </table>\n          </div>\n        </div>\n\n        <!-- CARD MODE -->\n        <div id="batchCardMode" style="display:none;">\n          <div class="batch-card-counter" id="cardCounter"></div>\n          <div class="batch-progress-bar"><div class="batch-progress-fill" id="cardProgressFill"></div></div>\n          <div class="batch-card-wrap">\n            <div class="batch-card-main" id="batchCardContent"></div>\n          </div>\n          <div style="display:flex;justify-content:center;gap:10px;margin-top:14px;">\n            <button class="btn btn-secondary btn-sm" id="cardPrevBtn" onclick="cardNav(-1)">← Prev</button>\n            <button class="btn btn-secondary btn-sm" id="cardNextBtn" onclick="cardNav(1)">Next →</button>\n          </div>\n        </div>\n\n        <!-- DIFF MODE -->\n        <div id="batchDiffMode" style="display:none;">\n          <div id="batchDiffList"></div>\n        </div>\n\n        <!-- Sticky bottom bar -->\n        <div class="batch-bottom-bar">\n          <span class="batch-accept-count" id="batchAcceptCount">0 accepted</span>\n          <button class="btn btn-secondary btn-sm" onclick="resetBatch()">← Start Over</button>\n          <button class="btn btn-success" id="batchSaveBtn" onclick="saveBatch()">💾 Bulk Save</button>\n        </div>\n\n      </div>\n\n    </div>\n\n    <!-- ── DEV LOG TAB ──────────────────────────────────────────────────────── -->
+    <!-- ── BATCH AI TAB ─────────────────────────────────────────────────────── -->
+    <div id="tab-batch" class="tab-panel">
+
+      <!-- State: READY (no items loaded yet) -->
+      <div id="batchReady">
+        <p class="section-title">AI Batch Processor</p>
+        <p style="font-size:13px;color:var(--muted);margin-bottom:20px;">
+          Paste items below or route from the Capture tab. One API call processes everything at once.
+        </p>
+        <div class="form-group">
+          <label class="form-label">Items to process (one per line)</label>
+          <textarea id="batchInput" placeholder="Fix barrel pricing strategy&#10;Call lockbox vendor&#10;Update Ridge Co SMS template&#10;Schedule WV cabin deep clean" rows="8"></textarea>
+        </div>
+        <div class="form-row" style="margin-bottom:12px;">
+          <div class="form-group">
+            <label class="form-label">Default Venture</label>
+            <select id="batchVenture">
+              <option value="">— mixed / let AI decide —</option>
+              <option value="ridge_co">Ridge Co</option>
+              <option value="barrel_co">BarrelCo</option>
+              <option value="handyman">Handyman</option>
+              <option value="cabin">WV Cabin</option>
+              <option value="personal">Personal</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Treat items as</label>
+            <select id="batchDefaultType">
+              <option value="wbm">WBMs (What Bugs Me)</option>
+              <option value="task">Tasks</option>
+              <option value="auto">Auto-detect</option>
+            </select>
+          </div>
+        </div>
+        <button class="btn btn-primary btn-full" id="batchRunBtn" onclick="runBatch()">
+          🤖 Run AI Batch
+        </button>
+        <p style="font-size:11px;color:var(--muted);margin-top:8px;text-align:center;">
+          Single API call · Tags all items · Detects patterns
+        </p>
+      </div>
+
+      <!-- State: PROCESSING -->
+      <div id="batchProcessing" style="display:none;">
+        <div class="loading-row" style="justify-content:center;padding:48px 0;flex-direction:column;gap:16px;">
+          <div class="spinner" style="width:32px;height:32px;border-width:3px;"></div>
+          <div style="text-align:center;">
+            <div style="font-size:15px;font-weight:600;" id="batchProcessingMsg">Processing items...</div>
+            <div style="font-size:12px;color:var(--muted);margin-top:4px;" id="batchProcessingCount"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- State: REVIEW -->
+      <div id="batchReview" style="display:none;">
+
+        <!-- AI Log strip -->
+        <div class="ai-log-strip" id="batchAiLogStrip"></div>
+
+        <!-- Batch insights -->
+        <div class="batch-insights" id="batchInsightsBox" style="display:none;">
+          <div class="batch-insights-title">🧠 Batch Insights</div>
+          <div id="batchInsightsContent"></div>
+        </div>
+
+        <!-- Mode toggle -->
+        <div class="batch-mode-bar">
+          <button id="modeTableBtn" class="active" onclick="setBatchMode('table')">📊 Table</button>
+          <button id="modeCardBtn"  onclick="setBatchMode('card')">🃏 Card</button>
+          <button id="modeDiffBtn"  onclick="setBatchMode('diff')">↔ Diff</button>
+        </div>
+
+        <!-- TABLE MODE -->
+        <div id="batchTableMode">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+            <button class="btn btn-secondary btn-sm" onclick="selectAllBatch(true)">Select All</button>
+            <button class="btn btn-secondary btn-sm" onclick="selectAllBatch(false)">Deselect All</button>
+            <span style="font-size:12px;color:var(--muted);margin-left:auto;" id="tableSelCount"></span>
+          </div>
+          <div class="table-scroll">
+            <table class="batch-table" id="batchTable">
+              <thead>
+                <tr>
+                  <th class="row-check"><input type="checkbox" id="tableCheckAll" onchange="selectAllBatch(this.checked)"></th>
+                  <th>Title</th>
+                  <th>Type</th>
+                  <th>Venture</th>
+                  <th>Priority</th>
+                  <th>Context</th>
+                  <th>Tags</th>
+                </tr>
+              </thead>
+              <tbody id="batchTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- CARD MODE -->
+        <div id="batchCardMode" style="display:none;">
+          <div class="batch-card-counter" id="cardCounter"></div>
+          <div class="batch-progress-bar"><div class="batch-progress-fill" id="cardProgressFill"></div></div>
+          <div class="batch-card-wrap">
+            <div class="batch-card-main" id="batchCardContent"></div>
+          </div>
+          <div style="display:flex;justify-content:center;gap:10px;margin-top:14px;">
+            <button class="btn btn-secondary btn-sm" id="cardPrevBtn" onclick="cardNav(-1)">← Prev</button>
+            <button class="btn btn-secondary btn-sm" id="cardNextBtn" onclick="cardNav(1)">Next →</button>
+          </div>
+        </div>
+
+        <!-- DIFF MODE -->
+        <div id="batchDiffMode" style="display:none;">
+          <div id="batchDiffList"></div>
+        </div>
+
+        <!-- Sticky bottom bar -->
+        <div class="batch-bottom-bar">
+          <span class="batch-accept-count" id="batchAcceptCount">0 accepted</span>
+          <button class="btn btn-secondary btn-sm" onclick="resetBatch()">← Start Over</button>
+          <button class="btn btn-success" id="batchSaveBtn" onclick="saveBatch()">💾 Bulk Save</button>
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- ── DEV LOG TAB ──────────────────────────────────────────────────────── -->
     <div id="tab-devlog" class="tab-panel">
       <p class="section-title">Dev Log — BrettOS Wishlist</p>
 
@@ -841,6 +999,10 @@ main {
     <div class="form-group">
       <label class="form-label">Venture(s)</label>
       <div class="chip-group" id="modalVentureChips"></div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Project(s) <span style="font-weight:400;text-transform:none;">(optional)</span></label>
+      <div class="chip-group" id="modalProjectChips"></div>
     </div>
     <div class="form-group">
       <label class="form-label">Priority</label>
@@ -1030,6 +1192,96 @@ main {
       <input type="text" id="taskEditNextAction" placeholder="Single next physical step...">
     </div>
     <button class="btn btn-primary btn-full" onclick="submitTaskEdit()">Save</button>
+  </div>
+</div>
+
+<!-- ── WBM BULK APPLY MODAL ─────────────────────────────────────────────────── -->
+<div class="modal-overlay" id="wbmBulkModal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">Apply to Selected</span>
+      <button class="modal-close" onclick="closeWBMBulkModal()">✕</button>
+    </div>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:14px;">
+      Adds these venture(s)/project(s) to all checked entries — existing tags are kept, not replaced.
+    </p>
+    <div class="form-group">
+      <label class="form-label">Venture(s) to add</label>
+      <div class="chip-group" id="wbmBulkVentureChips"></div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Project(s) to add</label>
+      <div class="chip-group" id="wbmBulkProjectChips"></div>
+    </div>
+    <button class="btn btn-primary btn-full" onclick="submitWBMBulkApply()">Apply to Selected</button>
+  </div>
+</div>
+
+<!-- ── PATTERN APPLY-TO-PROJECT MODAL ───────────────────────────────────────── -->
+<div class="modal-overlay" id="applyPatternModal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">Apply Pattern to Project(s)</span>
+      <button class="modal-close" onclick="closeApplyPatternModal()">✕</button>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Project(s)</label>
+      <div class="chip-group" id="patternApplyProjectChips"></div>
+    </div>
+    <button class="btn btn-primary btn-full" onclick="submitApplyPattern()">Save</button>
+  </div>
+</div>
+
+<!-- ── DEV LOG CONVERT MODAL ────────────────────────────────────────────────── -->
+<div class="modal-overlay" id="devlogConvertModal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title" id="devlogConvertModalTitle">Convert</span>
+      <button class="modal-close" onclick="closeDevLogConvertModal()">✕</button>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Title</label>
+      <textarea id="devlogConvertTitle" rows="2"></textarea>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Venture(s)</label>
+      <div class="chip-group" id="devlogConvertVentureChips"></div>
+    </div>
+
+    <!-- Task-specific fields -->
+    <div id="devlogConvertTaskFields">
+      <div class="form-group">
+        <label class="form-label">Project(s) <span style="font-weight:400;text-transform:none;">(optional)</span></label>
+        <div class="chip-group" id="devlogConvertProjectChips"></div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Priority</label>
+        <select id="devlogConvertPriority">
+          <option value="medium">Medium</option>
+          <option value="critical">Critical</option>
+          <option value="high">High</option>
+          <option value="low">Low</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Next Action</label>
+        <input type="text" id="devlogConvertNextAction" placeholder="Single next physical step...">
+      </div>
+    </div>
+
+    <!-- Project-specific fields -->
+    <div id="devlogConvertProjectFields" style="display:none;">
+      <div class="form-group">
+        <label class="form-label">Description</label>
+        <textarea id="devlogConvertDescription" rows="2"></textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Phase</label>
+        <input type="text" id="devlogConvertPhase" placeholder="e.g. Foundation, Phase 2...">
+      </div>
+    </div>
+
+    <button class="btn btn-primary btn-full" onclick="submitDevLogConvert()">Convert</button>
   </div>
 </div>
 
@@ -1250,9 +1502,19 @@ function setModalType(type) {
 }
 
 // ── MODAL ─────────────────────────────────────────────────────────────────────
+function renderProjectChips(containerId, selected = []) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  el.innerHTML = allProjects.map(p => `
+    <button type="button" class="venture-chip ${selected.includes(p.Project_ID) ? 'selected' : ''}"
+      data-code="${esc(p.Project_ID)}" onclick="toggleVentureChip(this, 'var(--accent2)')">${esc(p.Title)}</button>
+  `).join('') || '<span style="font-size:12px;color:var(--muted);">No projects yet</span>';
+}
+
 function openCapture() {
   document.getElementById('captureModal').classList.add('open');
   renderVentureChips('modalVentureChips', []);
+  renderProjectChips('modalProjectChips', []);
   setTimeout(() => document.getElementById('modalText').focus(), 100);
 }
 function closeCapture() {
@@ -1270,6 +1532,7 @@ async function submitModal() {
       type:    modalType,
       text,
       venture: getSelectedVentures('modalVentureChips'),
+      project_ids: getSelectedVentures('modalProjectChips'),
       priority:document.getElementById('modalPriority').value,
       source:  'web_ui'
     });
@@ -1293,6 +1556,7 @@ async function submitCapture() {
       type:     captureType,
       text,
       venture:  getSelectedVentures('captureVentureChips'),
+      project_ids: getSelectedVentures('captureProjectChips'),
       location: document.getElementById('captureLocation').value,
       context:  document.getElementById('captureContext').value,
       device:   document.getElementById('captureDevice').value,
@@ -1327,6 +1591,7 @@ function routeToBatch() {
 let batchItems    = [];   // raw AI output array
 let batchDecisions= {};   // { index: 'accepted'|'skipped' }
 let batchEdits    = {};   // { index: { field: value } }
+let batchPatternsDetected = []; // [{text, category, item_indices}] from last /batch call
 let batchMode     = 'table';
 let cardIndex     = 0;
 
@@ -1368,6 +1633,7 @@ async function runBatch() {
     batchItems     = result.items || [];
     batchDecisions = {};
     batchEdits     = {};
+    batchPatternsDetected = (result.batch_insights && result.batch_insights.patterns_detected) || [];
     batchItems.forEach((_, i) => { batchDecisions[i] = 'accepted'; });
 
     // Render AI log strip
@@ -1381,11 +1647,11 @@ async function runBatch() {
 
     // Render batch insights
     const insights = result.batch_insights;
-    if (insights && (insights.patterns_detected?.length || insights.project_clusters?.length || insights.suggested_relationships?.length)) {
+    if (insights && (batchPatternsDetected.length || insights.project_clusters?.length || insights.suggested_relationships?.length)) {
       let html = '';
-      if (insights.patterns_detected?.length) {
-        html += `<div style="margin-bottom:6px;font-weight:600;">Patterns detected:</div><ul>` +
-          insights.patterns_detected.map(p => `<li>${esc(p)}</li>`).join('') + '</ul>';
+      if (batchPatternsDetected.length) {
+        html += `<div style="margin-bottom:6px;font-weight:600;">Patterns detected <span style="font-weight:400;color:var(--muted);">(will be saved as "suggested" for review in Patterns tab)</span>:</div><ul>` +
+          batchPatternsDetected.map(p => `<li>${esc(p.text)} <span style="color:var(--muted);">— items ${(p.item_indices||[]).join(', ')}</span></li>`).join('') + '</ul>';
       }
       if (insights.project_clusters?.length) {
         html += `<div style="margin-bottom:6px;margin-top:8px;font-weight:600;">Project clusters:</div><ul>` +
@@ -1422,7 +1688,7 @@ function renderTable() {
     const ed  = batchEdits[i] || {};
     const title   = ed.title   ?? item.title   ?? '';
     const type    = ed.type    ?? item.type    ?? 'wbm';
-    const venture = ed.venture ?? item.venture ?? '';
+    const ventures= getBatchVentures(i);
     const priority= ed.priority?? item.priority?? 'medium';
     const context = ed.context ?? item.context ?? '';
     const tags    = ed.ai_tags ?? (item.ai_tags || []).join(', ');
@@ -1441,12 +1707,12 @@ function renderTable() {
           </select>
         </td>
         <td>
-          <select onchange="batchEdit(${i},'venture',this.value)" style="min-width:90px;">
-            <option value="">—</option>
-            ${allVentures.map(v =>
-              `<option value="${esc(v.Venture_Code)}" ${venture===v.Venture_Code?'selected':''}>${esc(v.Venture_Name)}</option>`
-            ).join('')}
-          </select>
+          <div class="chip-group" style="gap:3px;min-width:140px;">
+            ${allVentures.map(v => `
+              <button type="button" class="venture-chip" style="padding:2px 7px;font-size:10px;${ventures.includes(v.Venture_Code)?`background:${v.Color};border-color:${v.Color};color:#fff;`:''}"
+                onclick="toggleBatchVenture(${i}, '${esc(v.Venture_Code)}')">${esc(v.Venture_Name)}</button>
+            `).join('')}
+          </div>
         </td>
         <td>
           <select onchange="batchEdit(${i},'priority',this.value)">
@@ -1462,6 +1728,25 @@ function renderTable() {
       </tr>`;
   }).join('');
   updateTableSelCount();
+}
+
+// Normalizes a batch item's venture (string from AI or array from edits) to an array
+function getBatchVentures(i) {
+  const ed = batchEdits[i] || {};
+  const item = batchItems[i];
+  const raw = ed.venture ?? item.venture ?? [];
+  if (Array.isArray(raw)) return raw;
+  return raw ? String(raw).split(',').map(s => s.trim()).filter(Boolean) : [];
+}
+
+function toggleBatchVenture(i, code) {
+  const current = getBatchVentures(i);
+  const idx = current.indexOf(code);
+  if (idx >= 0) current.splice(idx, 1); else current.push(code);
+  batchEdits[i] = batchEdits[i] || {};
+  batchEdits[i].venture = current;
+  if (batchMode === 'table') renderTable();
+  else if (batchMode === 'card') renderBatchCardVentureChips(i);
 }
 
 function toggleTableRow(i, checked) {
@@ -1499,7 +1784,6 @@ function renderCard() {
   const ed   = batchEdits[cardIndex] || {};
   const title   = ed.title    ?? item.title    ?? '';
   const type    = ed.type     ?? item.type     ?? 'wbm';
-  const venture = ed.venture  ?? item.venture  ?? '';
   const priority= ed.priority ?? item.priority ?? 'medium';
   const context = ed.context  ?? item.context  ?? '';
   const tags    = ed.ai_tags  ?? (item.ai_tags || []).join(', ');
@@ -1511,23 +1795,16 @@ function renderCard() {
       <label class="form-label">Title</label>
       <input type="text" value="${esc(title)}" oninput="batchEdit(${cardIndex},'title',this.value)">
     </div>
-    <div class="form-row">
-      <div class="batch-card-field">
-        <label class="form-label">Type</label>
-        <select onchange="batchEdit(${cardIndex},'type',this.value)">
-          <option value="wbm"  ${type==='wbm' ?'selected':''}>⚡ WBM</option>
-          <option value="task" ${type==='task'?'selected':''}>✅ Task</option>
-        </select>
-      </div>
-      <div class="batch-card-field">
-        <label class="form-label">Venture</label>
-        <select onchange="batchEdit(${cardIndex},'venture',this.value)">
-          <option value="">—</option>
-          ${allVentures.map(v =>
-            `<option value="${esc(v.Venture_Code)}" ${venture===v.Venture_Code?'selected':''}>${esc(v.Venture_Name)}</option>`
-          ).join('')}
-        </select>
-      </div>
+    <div class="batch-card-field">
+      <label class="form-label">Type</label>
+      <select onchange="batchEdit(${cardIndex},'type',this.value)">
+        <option value="wbm"  ${type==='wbm' ?'selected':''}>⚡ WBM</option>
+        <option value="task" ${type==='task'?'selected':''}>✅ Task</option>
+      </select>
+    </div>
+    <div class="batch-card-field">
+      <label class="form-label">Venture(s)</label>
+      <div class="chip-group" id="batchCardVentureChips"></div>
     </div>
     <div class="form-row">
       <div class="batch-card-field">
@@ -1560,6 +1837,18 @@ function renderCard() {
       Status: <b style="color:${dec==='accepted'?'var(--green)':dec==='skipped'?'var(--muted)':'var(--amber)'};">${dec || 'pending'}</b>
     </div>
   `;
+  renderBatchCardVentureChips(cardIndex);
+}
+
+function renderBatchCardVentureChips(i) {
+  const el = document.getElementById('batchCardVentureChips');
+  if (!el) return;
+  const selected = getBatchVentures(i);
+  el.innerHTML = allVentures.map(v => `
+    <button type="button" class="venture-chip ${selected.includes(v.Venture_Code) ? 'selected' : ''}"
+      style="${selected.includes(v.Venture_Code) ? `background:${v.Color};border-color:${v.Color};` : ''}"
+      onclick="toggleBatchVenture(${i}, '${esc(v.Venture_Code)}')">${esc(v.Venture_Name)}</button>
+  `).join('');
 }
 
 function cardNav(dir) {
@@ -1581,7 +1870,7 @@ function renderDiff() {
     const original = item._original || item.title || '';
     const title   = ed.title    ?? item.title    ?? '';
     const type    = ed.type     ?? item.type     ?? 'wbm';
-    const venture = ed.venture  ?? item.venture  ?? '';
+    const ventures= getBatchVentures(i);
     const priority= ed.priority ?? item.priority ?? 'medium';
     const tags    = ed.ai_tags  ?? (item.ai_tags || []).join(', ');
     const nextAct = ed.next_action ?? item.next_action ?? '';
@@ -1606,8 +1895,8 @@ function renderDiff() {
               <div style="font-size:13px;font-weight:600;${changed?'color:var(--green)':''}">${esc(title)}</div>
               <div class="diff-field"><span class="diff-field-label">type:</span>
                 <span ${type!=='wbm'?'class="diff-changed"':''}>${esc(type)}</span></div>
-              ${venture?`<div class="diff-field"><span class="diff-field-label">venture:</span>
-                <span class="diff-changed">${fmtVenture(venture)}</span></div>`:''}
+              ${ventures.length?`<div class="diff-field"><span class="diff-field-label">venture:</span>
+                <span class="diff-changed">${ventures.map(v => { const vd = allVentures.find(av=>av.Venture_Code===v); return esc(vd ? vd.Venture_Name : v); }).join(', ')}</span></div>`:''}
               ${priority&&priority!=='medium'?`<div class="diff-field"><span class="diff-field-label">priority:</span>
                 <span class="diff-changed">${esc(priority)}</span></div>`:''}
               ${tags?`<div class="diff-field"><span class="diff-field-label">tags:</span>
@@ -1642,7 +1931,7 @@ function updateAcceptCount() {
 }
 
 function resetBatch() {
-  batchItems = []; batchDecisions = {}; batchEdits = {}; cardIndex = 0;
+  batchItems = []; batchDecisions = {}; batchEdits = {}; cardIndex = 0; batchPatternsDetected = [];
   document.getElementById('batchReady').style.display = '';
   document.getElementById('batchReview').style.display = 'none';
   document.getElementById('batchProcessing').style.display = 'none';
@@ -1657,13 +1946,14 @@ async function saveBatch() {
       return {
         type:        ed.type        ?? item.type        ?? 'wbm',
         title:       ed.title       ?? item.title       ?? '',
-        venture:     ed.venture     ?? item.venture     ?? '',
+        venture:     getBatchVentures(i),
         priority:    ed.priority    ?? item.priority    ?? 'medium',
         context:     ed.context     ?? item.context     ?? '',
         ai_tags:     ed.ai_tags     ?? (item.ai_tags    || []).join(', '),
         next_action: ed.next_action ?? item.next_action ?? '',
         project_suggestion: item.project_suggestion ?? '',
         _original:   item._original ?? '',
+        _index:      item._index,
       };
     })
     .filter(Boolean);
@@ -1674,8 +1964,10 @@ async function saveBatch() {
   btn.textContent = 'Saving...'; btn.disabled = true;
 
   try {
-    const result = await api('/batchSave', { items: toSave });
-    toast(`✅ Saved ${result.saved} items`, 'success');
+    const result = await api('/batchSave', { items: toSave, patterns: batchPatternsDetected });
+    let msg = `✅ Saved ${result.saved} items`;
+    if (result.patternsSaved) msg += ` · ${result.patternsSaved} pattern(s) suggested`;
+    toast(msg, 'success');
     // Clear bulk paste textarea too
     document.getElementById('bulkText').value = '';
     document.getElementById('batchInput').value = '';
@@ -1840,7 +2132,10 @@ async function loadWBM() {
     window._wbmCache = items; // stash for edit/convert lookups
     el.innerHTML = items.map((w, i) => `
       <div class="wbm-card" id="wbmCard-${i}">
-        <div class="wbm-id">${esc(w.WBM_ID)} · ${esc(w.Capture_Date)}</div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <input type="checkbox" class="wbm-bulk-check" data-i="${i}" onchange="updateWBMBulkBar()" style="width:auto;">
+          <div class="wbm-id">${esc(w.WBM_ID)} · ${esc(w.Capture_Date)}</div>
+        </div>
 
         <!-- VIEW MODE -->
         <div id="wbmView-${i}">
@@ -1849,6 +2144,10 @@ async function loadWBM() {
             ${(w.Venture || '').split(',').map(s => s.trim()).filter(Boolean).map(v => {
               const vd = allVentures.find(av => av.Venture_Code === v);
               return `<span class="tag" style="${vd ? `background:${vd.Color}22;color:${vd.Color};` : ''}">${vd ? esc(vd.Venture_Name) : esc(v)}</span>`;
+            }).join('')}
+            ${(w.Project_ID || '').split(',').map(s => s.trim()).filter(Boolean).map(pid => {
+              const pr = allProjects.find(ap => ap.Project_ID === pid);
+              return `<span class="tag">📁 ${pr ? esc(pr.Title) : esc(pid)}</span>`;
             }).join('')}
             ${w.Location ? `<span class="tag">📍 ${esc(w.Location)}</span>` : ''}
             <span class="tag">${esc(w.Status || 'raw')}</span>
@@ -1871,6 +2170,10 @@ async function loadWBM() {
             <div class="chip-group" id="wbmEditVentureChips-${i}"></div>
           </div>
           <div class="form-group">
+            <label class="form-label">Project(s)</label>
+            <div class="chip-group" id="wbmEditProjectChips-${i}"></div>
+          </div>
+          <div class="form-group">
             <label class="form-label">Status</label>
             <select id="wbmEditStatus-${i}">
               ${['raw','processed','converted','dismissed','pattern_only'].map(s =>
@@ -1885,8 +2188,71 @@ async function loadWBM() {
         </div>
       </div>
     `).join('');
+    updateWBMBulkBar();
   } catch(e) {
     el.innerHTML = `<div class="empty"><div class="empty-icon">⚠️</div><h3>Couldn't load WBMs</h3><p>${esc(e.message)}</p></div>`;
+  }
+}
+
+// ── WBM BULK APPLY ────────────────────────────────────────────────────────────
+function getSelectedWBMIndexes() {
+  return Array.from(document.querySelectorAll('.wbm-bulk-check:checked')).map(c => parseInt(c.dataset.i, 10));
+}
+
+function updateWBMBulkBar() {
+  const selected = getSelectedWBMIndexes();
+  const bar = document.getElementById('wbmBulkBar');
+  if (!bar) return;
+  if (selected.length === 0) {
+    bar.style.display = 'none';
+    return;
+  }
+  bar.style.display = '';
+  document.getElementById('wbmBulkCount').textContent = `${selected.length} selected`;
+}
+
+function openWBMBulkModal() {
+  renderVentureChips('wbmBulkVentureChips', []);
+  const projEl = document.getElementById('wbmBulkProjectChips');
+  projEl.innerHTML = allProjects.map(p => `
+    <button type="button" class="venture-chip" data-code="${esc(p.Project_ID)}"
+      onclick="toggleVentureChip(this, 'var(--accent2)')">${esc(p.Title)}</button>
+  `).join('') || '<span style="font-size:12px;color:var(--muted);">No projects yet</span>';
+  document.getElementById('wbmBulkModal').classList.add('open');
+}
+
+function closeWBMBulkModal() {
+  document.getElementById('wbmBulkModal').classList.remove('open');
+}
+
+async function submitWBMBulkApply() {
+  const indexes = getSelectedWBMIndexes();
+  const addVentures = getSelectedVentures('wbmBulkVentureChips');
+  const addProjects = getSelectedVentures('wbmBulkProjectChips');
+  if (addVentures.length === 0 && addProjects.length === 0) {
+    toast('Pick at least one venture or project to apply', 'error'); return;
+  }
+  const btn = document.querySelector('#wbmBulkModal .btn-primary');
+  btn.textContent = 'Applying...'; btn.disabled = true;
+  try {
+    for (const i of indexes) {
+      const w = window._wbmCache[i];
+      const currentVentures = (w.Venture || '').split(',').map(s => s.trim()).filter(Boolean);
+      const currentProjects = (w.Project_ID || '').split(',').map(s => s.trim()).filter(Boolean);
+      const mergedVentures = Array.from(new Set([...currentVentures, ...addVentures]));
+      const mergedProjects = Array.from(new Set([...currentProjects, ...addProjects]));
+      await api('/wbm/update', {
+        WBM_ID: w.WBM_ID,
+        fields: { Venture: mergedVentures, Project_ID: mergedProjects }
+      });
+    }
+    toast(`Applied to ${indexes.length} entries`, 'success');
+    closeWBMBulkModal();
+    loadWBM();
+  } catch(e) {
+    toast('Bulk apply failed: ' + e.message, 'error');
+  } finally {
+    btn.textContent = 'Apply to Selected'; btn.disabled = false;
   }
 }
 
@@ -1899,19 +2265,27 @@ function toggleWBMEdit(i) {
   edit.style.display = editing ? 'none' : '';
   if (!editing) {
     const w = window._wbmCache[i];
-    const selected = (w.Venture || '').split(',').map(s => s.trim()).filter(Boolean);
-    renderVentureChips('wbmEditVentureChips-' + i, selected);
+    const selectedV = (w.Venture || '').split(',').map(s => s.trim()).filter(Boolean);
+    renderVentureChips('wbmEditVentureChips-' + i, selectedV);
+    const selectedP = (w.Project_ID || '').split(',').map(s => s.trim()).filter(Boolean);
+    const projEl = document.getElementById('wbmEditProjectChips-' + i);
+    projEl.innerHTML = allProjects.map(p => `
+      <button type="button" class="venture-chip ${selectedP.includes(p.Project_ID)?'selected':''}"
+        data-code="${esc(p.Project_ID)}" onclick="toggleVentureChip(this, 'var(--accent2)')">${esc(p.Title)}</button>
+    `).join('') || '<span style="font-size:12px;color:var(--muted);">No projects yet</span>';
   }
 }
 
 async function saveWBMEdit(i) {
   const w = window._wbmCache[i];
   const fields = {
-    Text:    document.getElementById('wbmEditText-' + i).value.trim(),
-    Venture: getSelectedVentures('wbmEditVentureChips-' + i),
-    Status:  document.getElementById('wbmEditStatus-' + i).value,
+    Text:      document.getElementById('wbmEditText-' + i).value.trim(),
+    Venture:   getSelectedVentures('wbmEditVentureChips-' + i),
+    Project_ID:getSelectedVentures('wbmEditProjectChips-' + i),
+    Status:    document.getElementById('wbmEditStatus-' + i).value,
   };
   try {
+
     await api('/wbm/update', { WBM_ID: w.WBM_ID, fields });
     toast('WBM updated', 'success');
     loadWBM();
@@ -1976,31 +2350,113 @@ async function submitConvert() {
 async function loadPatterns() {
   const el = document.getElementById('patternsList');
   el.innerHTML = '<div class="loading-row"><div class="spinner"></div> Loading...</div>';
+  if (allProjects.length === 0) await loadProjects();
   try {
     const data = await api('/patterns', null, 'GET');
     const items = data.patterns || [];
+    window._patternsCache = items;
 
     if (items.length === 0) {
       el.innerHTML = `<div class="empty"><div class="empty-icon">🧠</div><h3>No patterns yet</h3><p>Patterns emerge as you capture WBMs and tasks over time.</p></div>`;
       return;
     }
 
-    el.innerHTML = items.map(p => `
-      <div class="pattern-card">
+    // Suggested first (need review), then confirmed, then weak
+    const order = { suggested: 0, confirmed: 1, weak: 2 };
+    items.sort((a, b) => (order[a.Confidence] ?? 3) - (order[b.Confidence] ?? 3));
+
+    el.innerHTML = items.map((p, i) => {
+      const evidence = (p.Evidence_IDs || '').split(',').map(s => s.trim()).filter(Boolean);
+      const appliedProjects = (p.Applied_To || '').split(',').map(s => s.trim()).filter(Boolean);
+      const isSuggested = p.Confidence === 'suggested' || p.Confidence === 'weak';
+      return `
+      <div class="pattern-card" style="${isSuggested ? 'border-left-color:var(--amber);' : ''}" id="patternCard-${i}">
         <div style="display:flex;align-items:center;gap:8px;">
           <span class="pattern-id">${esc(p.Pattern_ID)}</span>
           <span class="tag">${esc(p.Category)}</span>
-          <span class="tag" style="margin-left:auto;">${esc(p.Confidence)}</span>
+          <span class="tag" style="margin-left:auto;${p.Confidence==='confirmed'?`color:var(--green);`:p.Confidence==='suggested'?`color:var(--amber);`:''}">${esc(p.Confidence)}</span>
         </div>
         <div class="pattern-text">${esc(p.Pattern_Text)}</div>
         <div class="pattern-meta">
           <span>First seen: ${esc(p.First_Seen)}</span>
-          ${p.Applied_To ? `<span>Applied to: ${esc(p.Applied_To)}</span>` : ''}
+          ${p.Source_Type ? `<span>Source: ${esc(p.Source_Type)}</span>` : ''}
+        </div>
+        ${evidence.length ? `<div class="pattern-meta" style="margin-top:4px;">Evidence: ${evidence.map(e => `<span class="tag" style="font-family:var(--mono);">${esc(e)}</span>`).join(' ')}</div>` : ''}
+        ${appliedProjects.length ? `<div class="pattern-meta" style="margin-top:4px;">Applied to: ${appliedProjects.map(pid => {
+          const pr = allProjects.find(ap => ap.Project_ID === pid);
+          return `<span class="tag">📁 ${pr ? esc(pr.Title) : esc(pid)}</span>`;
+        }).join(' ')}</div>` : ''}
+        <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;">
+          ${p.Confidence !== 'confirmed' ? `<button class="btn btn-success btn-sm" onclick="confirmPattern(${i})">✓ Confirm</button>` : ''}
+          <button class="btn btn-secondary btn-sm" onclick="rejectPattern(${i})">✕ Reject</button>
+          <button class="btn btn-secondary btn-sm" onclick="openApplyPatternModal(${i})">📁 Apply to Project</button>
         </div>
       </div>
-    `).join('');
+    `; }).join('');
   } catch(e) {
     el.innerHTML = `<div class="empty"><div class="empty-icon">⚠️</div><h3>Couldn't load patterns</h3><p>${esc(e.message)}</p></div>`;
+  }
+}
+
+async function confirmPattern(i) {
+  const p = window._patternsCache[i];
+  try {
+    await api('/patterns/update', { Pattern_ID: p.Pattern_ID, fields: { Confidence: 'confirmed' } });
+    toast('Pattern confirmed — now active in future AI batches', 'success');
+    loadPatterns();
+  } catch(e) {
+    toast('Failed: ' + e.message, 'error');
+  }
+}
+
+async function rejectPattern(i) {
+  const p = window._patternsCache[i];
+  try {
+    await api('/patterns/update', { Pattern_ID: p.Pattern_ID, fields: { Active: 'FALSE' } });
+    toast('Pattern rejected', 'success');
+    loadPatterns();
+  } catch(e) {
+    toast('Failed: ' + e.message, 'error');
+  }
+}
+
+let applyingPatternIndex = null;
+function openApplyPatternModal(i) {
+  applyingPatternIndex = i;
+  const p = window._patternsCache[i];
+  const current = (p.Applied_To || '').split(',').map(s => s.trim()).filter(Boolean);
+  renderProjectChips('patternApplyProjectChips', current);
+  document.getElementById('applyPatternModal').classList.add('open');
+}
+function closeApplyPatternModal() {
+  document.getElementById('applyPatternModal').classList.remove('open');
+  applyingPatternIndex = null;
+}
+async function submitApplyPattern() {
+  const p = window._patternsCache[applyingPatternIndex];
+  const projects = getSelectedVentures('patternApplyProjectChips');
+  try {
+    await api('/patterns/update', { Pattern_ID: p.Pattern_ID, fields: { Applied_To: projects } });
+    toast('Applied to project(s)', 'success');
+    closeApplyPatternModal();
+    loadPatterns();
+  } catch(e) {
+    toast('Failed: ' + e.message, 'error');
+  }
+}
+
+async function addManualPattern() {
+  const textEl = document.getElementById('newPatternText');
+  const catEl  = document.getElementById('newPatternCategory');
+  const text = textEl.value.trim();
+  if (!text) { toast('Enter a pattern description', 'error'); return; }
+  try {
+    await api('/patterns', { text, category: catEl.value });
+    toast('Pattern added', 'success');
+    textEl.value = '';
+    loadPatterns();
+  } catch(e) {
+    toast('Failed: ' + e.message, 'error');
   }
 }
 
@@ -2008,24 +2464,135 @@ async function loadPatterns() {
 async function loadDevLog() {
   const el = document.getElementById('devlogList');
   el.innerHTML = '<div class="loading-row"><div class="spinner"></div> Loading...</div>';
+  if (allVentures.length === 0) await loadVentures();
+  if (allProjects.length === 0) await loadProjects();
   try {
     const data = await api('/devlog', null, 'GET');
     const items = data.devlog || [];
+    window._devlogCache = items;
     if (items.length === 0) {
       el.innerHTML = `<div class="empty"><div class="empty-icon">📋</div><h3>Dev log is empty</h3><p>Add feature ideas or bugs above.</p></div>`;
       return;
     }
-    el.innerHTML = items.map(d => `
-      <div class="card" style="display:flex;align-items:center;gap:10px;">
-        <div style="flex:1;">
-          <div class="card-title" style="font-size:13px;">${esc(d.Text)}</div>
-          <div class="card-meta"><span class="tag status-${d.Status === 'wishlist' ? 'backlog' : d.Status === 'planned' ? 'next_up' : 'in_progress'}">${esc(d.Status)}</span><span>${esc(d.Created)}</span></div>
+    el.innerHTML = items.map((d, i) => `
+      <div class="card" id="devlogCard-${i}">
+        <div id="devlogView-${i}">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <div style="flex:1;">
+              <div class="card-title" style="font-size:13px;">${esc(d.Text)}</div>
+              <div class="card-meta">
+                <span class="tag status-${d.Status === 'wishlist' ? 'backlog' : d.Status === 'planned' ? 'next_up' : 'in_progress'}">${esc(d.Status)}</span>
+                <span>${esc(d.Created)}</span>
+                ${d.Spawned_ID ? `<span class="tag">→ ${esc(d.Spawned_ID)}</span>` : ''}
+              </div>
+            </div>
+            <span style="font-family:var(--mono);font-size:11px;color:var(--muted);">${esc(d.ID)}</span>
+          </div>
+          ${!d.Spawned_ID ? `
+          <div style="display:flex;gap:8px;margin-top:10px;">
+            <button class="btn btn-secondary btn-sm" onclick="toggleDevLogEdit(${i})">✏️ Edit</button>
+            <button class="btn btn-primary btn-sm" onclick="openDevLogConvert(${i},'task')">✅ → Task</button>
+            <button class="btn btn-secondary btn-sm" onclick="openDevLogConvert(${i},'project')">📁 → Project</button>
+          </div>` : ''}
         </div>
-        <span style="font-family:var(--mono);font-size:11px;color:var(--muted);">${esc(d.ID)}</span>
+        <div id="devlogEdit-${i}" style="display:none;">
+          <div class="form-group">
+            <textarea id="devlogEditText-${i}" rows="2">${esc(d.Text)}</textarea>
+          </div>
+          <div class="form-group">
+            <select id="devlogEditStatus-${i}">
+              ${['wishlist','planned','in_progress','done'].map(s =>
+                `<option value="${s}" ${d.Status===s?'selected':''}>${s}</option>`
+              ).join('')}
+            </select>
+          </div>
+          <div style="display:flex;gap:8px;">
+            <button class="btn btn-secondary btn-sm" onclick="toggleDevLogEdit(${i})">Cancel</button>
+            <button class="btn btn-success btn-sm" onclick="saveDevLogEdit(${i})">Save</button>
+          </div>
+        </div>
       </div>
     `).join('');
   } catch(e) {
     el.innerHTML = `<div class="empty"><div class="empty-icon">⚠️</div><h3>Couldn't load dev log</h3><p>${esc(e.message)}</p></div>`;
+  }
+}
+
+function toggleDevLogEdit(i) {
+  const view = document.getElementById('devlogView-' + i);
+  const edit = document.getElementById('devlogEdit-' + i);
+  const editing = edit.style.display !== 'none';
+  view.style.display = editing ? '' : 'none';
+  edit.style.display = editing ? 'none' : '';
+}
+
+async function saveDevLogEdit(i) {
+  const d = window._devlogCache[i];
+  try {
+    await api('/devlog/update', {
+      ID: d.ID,
+      fields: {
+        Text:   document.getElementById('devlogEditText-' + i).value.trim(),
+        Status: document.getElementById('devlogEditStatus-' + i).value,
+      }
+    });
+    toast('Dev log entry updated', 'success');
+    loadDevLog();
+  } catch(e) {
+    toast('Failed: ' + e.message, 'error');
+  }
+}
+
+// ── DEV LOG → TASK/PROJECT CONVERSION ──────────────────────────────────────────
+let devlogConvertingIndex = null;
+let devlogConvertTarget = 'task';
+
+function openDevLogConvert(i, target) {
+  devlogConvertingIndex = i;
+  devlogConvertTarget = target;
+  const d = window._devlogCache[i];
+  document.getElementById('devlogConvertTitle').value = d.Text || '';
+  document.getElementById('devlogConvertModalTitle').textContent =
+    target === 'task' ? 'Convert to Task' : 'Convert to Project';
+  document.getElementById('devlogConvertTaskFields').style.display = target === 'task' ? '' : 'none';
+  document.getElementById('devlogConvertProjectFields').style.display = target === 'project' ? '' : 'none';
+  renderVentureChips('devlogConvertVentureChips', []);
+  if (target === 'task') renderProjectChips('devlogConvertProjectChips', []);
+  document.getElementById('devlogConvertModal').classList.add('open');
+}
+
+function closeDevLogConvertModal() {
+  document.getElementById('devlogConvertModal').classList.remove('open');
+  devlogConvertingIndex = null;
+}
+
+async function submitDevLogConvert() {
+  const d = window._devlogCache[devlogConvertingIndex];
+  const btn = document.querySelector('#devlogConvertModal .btn-primary');
+  btn.textContent = 'Converting...'; btn.disabled = true;
+  try {
+    const payload = {
+      ID: d.ID,
+      target: devlogConvertTarget,
+      title: document.getElementById('devlogConvertTitle').value.trim(),
+      venture: getSelectedVentures('devlogConvertVentureChips'),
+    };
+    if (devlogConvertTarget === 'task') {
+      payload.priority = document.getElementById('devlogConvertPriority').value;
+      payload.next_action = document.getElementById('devlogConvertNextAction').value.trim();
+      payload.project_ids = getSelectedVentures('devlogConvertProjectChips');
+    } else {
+      payload.description = document.getElementById('devlogConvertDescription').value.trim();
+      payload.phase = document.getElementById('devlogConvertPhase').value.trim();
+    }
+    const result = await api('/devlog/convert', payload);
+    toast(`✅ Converted to ${result.spawnedId}`, 'success');
+    closeDevLogConvertModal();
+    loadDevLog();
+  } catch(e) {
+    toast('Convert failed: ' + e.message, 'error');
+  } finally {
+    btn.textContent = 'Convert'; btn.disabled = false;
   }
 }
 
@@ -2147,6 +2714,7 @@ async function initApp() {
   await loadVentures();
   await loadProjects();
   renderVentureChips('captureVentureChips', []);
+  renderProjectChips('captureProjectChips', []);
   populateVentureFilter();
   const bulkSel = document.getElementById('bulkVenture');
   bulkSel.innerHTML = '<option value="">— venture (all) —</option>' +
