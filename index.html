@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>BrettOS v2.0</title>
+<title>BrettOS v3.0</title>
 <style>
 /* ── TOKENS ────────────────────────────────────────────────────────────────── */
 :root {
@@ -554,6 +554,35 @@ main {
   font-family: var(--mono);
 }
 .ai-log-strip span b { color: var(--text); }
+
+/* ── VENTURE / PROJECT CHIP PICKER ──────────────────────────────────────────── */
+.chip-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.venture-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.venture-chip.selected {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+.venture-chip-add {
+  border-style: dashed;
+  background: none;
+}
+.venture-chip-add:hover { color: var(--text); border-color: var(--muted); }
 </style>
 </head>
 <body>
@@ -563,7 +592,7 @@ main {
   <header>
     <div>
       <div class="logo">Brett<span>OS</span></div>
-      <div class="version">v2.0 · Phase 2</div>
+      <div class="version">v3.0 · Phase 3</div>
     </div>
     <div class="spacer"></div>
     <button id="quickCaptureBtn" onclick="openCapture()">+ Capture</button>
@@ -575,6 +604,7 @@ main {
     <button class="tab-btn" onclick="showTab('tasks', this)">✅ Tasks</button>
     <button class="tab-btn" onclick="showTab('wbm', this)">⚡ What Bugs Me</button>
     <button class="tab-btn" onclick="showTab('patterns', this)">🧠 Patterns</button>
+    <button class="tab-btn" onclick="showTab('projects', this)">📁 Projects</button>
     <button class="tab-btn" id="batchTabBtn" onclick="showTab('batch', this)">🤖 Batch AI</button>
     <button class="tab-btn" onclick="showTab('devlog', this)">📋 Dev Log</button>
   </nav>
@@ -610,19 +640,11 @@ main {
           + Add Context (optional)
         </summary>
         <div style="margin-top:12px;">
+          <div class="form-group">
+            <label class="form-label">Venture(s)</label>
+            <div class="chip-group" id="captureVentureChips"></div>
+          </div>
           <div class="form-row">
-            <div class="form-group">
-              <label class="form-label">Venture</label>
-              <select id="captureVenture">
-                <option value="">— select —</option>
-                <option value="ridge_co">Ridge Co</option>
-                <option value="barrel_co">BarrelCo</option>
-                <option value="handyman">Handyman</option>
-                <option value="cabin">WV Cabin</option>
-                <option value="personal">Personal</option>
-                <option value="multiple">Multiple</option>
-              </select>
-            </div>
             <div class="form-group">
               <label class="form-label">Location</label>
               <select id="captureLocation">
@@ -695,12 +717,6 @@ main {
         <div class="form-row">
           <select id="bulkVenture">
             <option value="">— venture (all) —</option>
-            <option value="ridge_co">Ridge Co</option>
-            <option value="barrel_co">BarrelCo</option>
-            <option value="handyman">Handyman</option>
-            <option value="cabin">WV Cabin</option>
-            <option value="personal">Personal</option>
-            <option value="multiple">Multiple</option>
           </select>
           <button class="btn btn-primary" onclick="routeToBatch()">🤖 Process with AI →</button>
         </div>
@@ -714,16 +730,16 @@ main {
     <div id="tab-tasks" class="tab-panel">
       <p class="section-title">Tasks</p>
 
+      <!-- Project filter banner (shown when drilled in from Projects tab) -->
+      <div id="projectFilterBanner" class="batch-insights" style="display:none;align-items:center;display:flex;gap:10px;">
+        <span></span>
+        <button class="btn btn-secondary btn-sm" style="margin-left:auto;" onclick="clearProjectFilter()">✕ Clear</button>
+      </div>
+
       <!-- Filters -->
       <div class="filter-bar">
         <select id="filterVenture" onchange="loadTasks()">
           <option value="">All ventures</option>
-          <option value="ridge_co">Ridge Co</option>
-          <option value="barrel_co">BarrelCo</option>
-          <option value="handyman">Handyman</option>
-          <option value="cabin">WV Cabin</option>
-          <option value="personal">Personal</option>
-          <option value="multiple">Multiple</option>
         </select>
         <select id="filterStatus" onchange="loadTasks()">
           <option value="">All statuses</option>
@@ -749,6 +765,18 @@ main {
       </div>
 
       <div id="tasksList"></div>
+    </div>
+
+    <!-- ── PROJECTS TAB ─────────────────────────────────────────────────────── -->
+    <div id="tab-projects" class="tab-panel">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+        <p class="section-title" style="margin:0;">Projects</p>
+        <button class="btn btn-primary btn-sm" onclick="openNewProjectModal()">+ New Project</button>
+      </div>
+      <p style="font-size:12px;color:var(--muted);margin-bottom:14px;">
+        Projects can span multiple ventures. Click a project to see its linked tasks.
+      </p>
+      <div id="projectsList"></div>
     </div>
 
     <!-- ── WBM TAB ──────────────────────────────────────────────────────────── -->
@@ -810,22 +838,164 @@ main {
     <div class="form-group">
       <textarea id="modalText" placeholder="Capture it fast..." rows="3" autofocus></textarea>
     </div>
+    <div class="form-group">
+      <label class="form-label">Venture(s)</label>
+      <div class="chip-group" id="modalVentureChips"></div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Priority</label>
+      <select id="modalPriority">
+        <option value="medium">Medium</option>
+        <option value="critical">Critical</option>
+        <option value="high">High</option>
+        <option value="low">Low</option>
+      </select>
+    </div>
+    <button class="btn btn-primary btn-full" onclick="submitModal()">Save</button>
+  </div>
+</div>
+
+<!-- ── CONVERT TO TASK MODAL ────────────────────────────────────────────────── -->
+<div class="modal-overlay" id="convertModal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">Convert to Task</span>
+      <button class="modal-close" onclick="closeConvertModal()">✕</button>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Title</label>
+      <textarea id="convertTitle" rows="2"></textarea>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Venture(s)</label>
+      <div class="chip-group" id="convertVentureChips"></div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Project(s) <span style="font-weight:400;text-transform:none;">(optional)</span></label>
+      <div class="chip-group" id="convertProjectChips"></div>
+    </div>
     <div class="form-row">
       <div class="form-group">
-        <label class="form-label">Venture</label>
-        <select id="modalVenture">
+        <label class="form-label">Priority</label>
+        <select id="convertPriority">
+          <option value="medium">Medium</option>
+          <option value="critical">Critical</option>
+          <option value="high">High</option>
+          <option value="low">Low</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Context</label>
+        <select id="convertContext">
           <option value="">— select —</option>
-          <option value="ridge_co">Ridge Co</option>
-          <option value="barrel_co">BarrelCo</option>
-          <option value="handyman">Handyman</option>
-          <option value="cabin">WV Cabin</option>
-          <option value="personal">Personal</option>
-          <option value="multiple">Multiple</option>
+          <option value="quick_hit">Quick hit</option>
+          <option value="deep_focus">Deep focus</option>
+          <option value="errand">Errand</option>
+          <option value="phone_call">Phone call</option>
+          <option value="waiting_on_someone">Waiting on someone</option>
+          <option value="planning">Planning</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Device</label>
+      <select id="convertDevice">
+        <option value="any">Any device</option>
+        <option value="phone_ok">Phone OK</option>
+        <option value="desktop_only">Desktop only</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Next Action</label>
+      <input type="text" id="convertNextAction" placeholder="Single next physical step...">
+    </div>
+    <button class="btn btn-primary btn-full" onclick="submitConvert()">Convert to Task</button>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div id="toast"></div>
+
+<!-- ── ADD VENTURE MODAL ────────────────────────────────────────────────────── -->
+<div class="modal-overlay" id="addVentureModal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">Add Venture</span>
+      <button class="modal-close" onclick="closeAddVentureModal()">✕</button>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Name</label>
+      <input type="text" id="newVentureName" placeholder="e.g. Roadside Stand" autofocus>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Color</label>
+      <input type="color" id="newVentureColor" value="#4f8ef7" style="height:38px;padding:4px;">
+    </div>
+    <button class="btn btn-primary btn-full" onclick="submitAddVenture()">Add Venture</button>
+  </div>
+</div>
+
+<!-- ── NEW PROJECT MODAL ────────────────────────────────────────────────────── -->
+<div class="modal-overlay" id="newProjectModal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">New Project</span>
+      <button class="modal-close" onclick="closeNewProjectModal()">✕</button>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Title</label>
+      <input type="text" id="newProjectTitle" placeholder="e.g. PIN system overhaul" autofocus>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Description</label>
+      <textarea id="newProjectDesc" rows="2" placeholder="Optional context..."></textarea>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Phase</label>
+      <input type="text" id="newProjectPhase" placeholder="e.g. Foundation, Phase 2...">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Venture(s)</label>
+      <div class="chip-group" id="projectVentureChips"></div>
+    </div>
+    <button class="btn btn-primary btn-full" onclick="submitNewProject()">Create Project</button>
+  </div>
+</div>
+
+<!-- ── TASK EDIT MODAL ──────────────────────────────────────────────────────── -->
+<div class="modal-overlay" id="taskEditModal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">Edit Task</span>
+      <button class="modal-close" onclick="closeTaskEditModal()">✕</button>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Title</label>
+      <textarea id="taskEditTitle" rows="2"></textarea>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Venture(s)</label>
+      <div class="chip-group" id="taskEditVentureChips"></div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Project(s)</label>
+      <div class="chip-group" id="taskEditProjectChips"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Status</label>
+        <select id="taskEditStatus">
+          <option value="backlog">Backlog</option>
+          <option value="next_up">Next up</option>
+          <option value="in_progress">In progress</option>
+          <option value="waiting">Waiting</option>
+          <option value="done">Done</option>
+          <option value="cancelled">Cancelled</option>
         </select>
       </div>
       <div class="form-group">
         <label class="form-label">Priority</label>
-        <select id="modalPriority">
+        <select id="taskEditPriority">
           <option value="medium">Medium</option>
           <option value="critical">Critical</option>
           <option value="high">High</option>
@@ -833,12 +1003,35 @@ main {
         </select>
       </div>
     </div>
-    <button class="btn btn-primary btn-full" onclick="submitModal()">Save</button>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Context</label>
+        <select id="taskEditContext">
+          <option value="">— select —</option>
+          <option value="quick_hit">Quick hit</option>
+          <option value="deep_focus">Deep focus</option>
+          <option value="errand">Errand</option>
+          <option value="phone_call">Phone call</option>
+          <option value="waiting_on_someone">Waiting on someone</option>
+          <option value="planning">Planning</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Device</label>
+        <select id="taskEditDevice">
+          <option value="any">Any device</option>
+          <option value="phone_ok">Phone OK</option>
+          <option value="desktop_only">Desktop only</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Next Action</label>
+      <input type="text" id="taskEditNextAction" placeholder="Single next physical step...">
+    </div>
+    <button class="btn btn-primary btn-full" onclick="submitTaskEdit()">Save</button>
   </div>
 </div>
-
-<!-- TOAST -->
-<div id="toast"></div>
 
 <script>
 // ── CONFIG ────────────────────────────────────────────────────────────────────
@@ -850,6 +1043,9 @@ let captureType = 'wbm';
 let modalType   = 'wbm';
 let recognition = null;
 let voiceActive = false;
+let allVentures = [];   // [{Venture_Code, Venture_Name, Color, Active}]
+let allProjects = [];   // [{Project_ID, Title, Venture, ...}]
+let projectFilterActive = ''; // when set, Tasks tab is scoped to this Project_ID
 
 // ── TABS ──────────────────────────────────────────────────────────────────────
 function showTab(name, btn) {
@@ -861,7 +1057,180 @@ function showTab(name, btn) {
   if (name === 'wbm')      loadWBM();
   if (name === 'patterns') loadPatterns();
   if (name === 'devlog')   loadDevLog();
+  if (name === 'projects') loadProjectsTab();
 }
+
+// ── VENTURES (data-driven) ──────────────────────────────────────────────────────
+async function loadVentures() {
+  try {
+    const data = await api('/ventures', null, 'GET');
+    allVentures = data.ventures || [];
+  } catch(e) {
+    console.error('Failed to load ventures', e);
+  }
+}
+
+async function loadProjects() {
+  try {
+    const data = await api('/projects', null, 'GET');
+    allProjects = data.projects || [];
+  } catch(e) {
+    console.error('Failed to load projects', e);
+  }
+}
+
+// ── VENTURE CHIP PICKER (reusable multi-select component) ──────────────────────
+// containerId: element to render chips into
+// selected: array of venture codes pre-selected
+function renderVentureChips(containerId, selected = []) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  el.innerHTML = allVentures.map(v => `
+    <button type="button" class="venture-chip ${selected.includes(v.Venture_Code) ? 'selected' : ''}"
+      data-code="${esc(v.Venture_Code)}" style="${selected.includes(v.Venture_Code) ? `background:${v.Color};border-color:${v.Color};` : ''}"
+      onclick="toggleVentureChip(this, '${esc(v.Color)}')">${esc(v.Venture_Name)}</button>
+  `).join('') + `<button type="button" class="venture-chip venture-chip-add" onclick="promptAddVenture('${containerId}')">+ Add Venture</button>`;
+}
+
+function toggleVentureChip(btn, color) {
+  const on = btn.classList.toggle('selected');
+  btn.style.background = on ? color : '';
+  btn.style.borderColor = on ? color : '';
+}
+
+function getSelectedVentures(containerId) {
+  return Array.from(document.querySelectorAll('#' + containerId + ' .venture-chip.selected'))
+    .map(b => b.dataset.code);
+}
+
+// ── ADD VENTURE MODAL ────────────────────────────────────────────────────────
+let addVentureTargetContainer = null;
+
+function promptAddVenture(returnToContainerId) {
+  addVentureTargetContainer = returnToContainerId;
+  document.getElementById('newVentureName').value = '';
+  document.getElementById('newVentureColor').value = '#4f8ef7';
+  document.getElementById('addVentureModal').classList.add('open');
+  setTimeout(() => document.getElementById('newVentureName').focus(), 100);
+}
+
+function closeAddVentureModal() {
+  document.getElementById('addVentureModal').classList.remove('open');
+}
+
+async function submitAddVenture() {
+  const name = document.getElementById('newVentureName').value.trim();
+  if (!name) { toast('Enter a venture name', 'error'); return; }
+  const color = document.getElementById('newVentureColor').value;
+  const btn = document.querySelector('#addVentureModal .btn-primary');
+  btn.textContent = 'Adding...'; btn.disabled = true;
+  try {
+    const result = await api('/ventures', { name, color });
+    await loadVentures();
+    closeAddVentureModal();
+    toast(`Venture "${name}" added`, 'success');
+    // Re-render whichever chip picker triggered this, with the new venture pre-selected
+    if (addVentureTargetContainer) {
+      const currentlySelected = getSelectedVentures(addVentureTargetContainer);
+      currentlySelected.push(result.code);
+      renderVentureChips(addVentureTargetContainer, currentlySelected);
+    }
+  } catch(e) {
+    toast('Failed: ' + e.message, 'error');
+  } finally {
+    btn.textContent = 'Add Venture'; btn.disabled = false;
+  }
+}
+
+// ── PROJECTS TAB ──────────────────────────────────────────────────────────────
+async function loadProjectsTab() {
+  const el = document.getElementById('projectsList');
+  el.innerHTML = '<div class="loading-row"><div class="spinner"></div> Loading projects...</div>';
+  await loadVentures();
+  try {
+    const data = await api('/projects', null, 'GET');
+    allProjects = data.projects || [];
+
+    if (allProjects.length === 0) {
+      el.innerHTML = `<div class="empty"><div class="empty-icon">📁</div><h3>No projects yet</h3><p>Create one to start grouping tasks across ventures.</p></div>`;
+      return;
+    }
+
+    el.innerHTML = allProjects.map(p => {
+      const ventures = (p.Venture || '').split(',').map(s => s.trim()).filter(Boolean);
+      return `
+        <div class="card" style="cursor:pointer;" onclick="openProjectDetail('${esc(p.Project_ID)}')">
+          <div class="card-title">${esc(p.Title)}</div>
+          ${p.Description ? `<div style="font-size:12px;color:var(--muted);margin-top:3px;">${esc(p.Description)}</div>` : ''}
+          <div class="card-meta">
+            <span class="tag status-${p.Status === 'active' ? 'in_progress' : 'backlog'}">${esc(p.Status)}</span>
+            ${p.Phase ? `<span class="tag">${esc(p.Phase)}</span>` : ''}
+            ${ventures.map(v => {
+              const vd = allVentures.find(av => av.Venture_Code === v);
+              return `<span class="tag" style="${vd ? `background:${vd.Color}22;color:${vd.Color};` : ''}">${vd ? esc(vd.Venture_Name) : esc(v)}</span>`;
+            }).join('')}
+            <span style="margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--muted);">${esc(p.Project_ID)}</span>
+          </div>
+        </div>
+      `;
+    }).join('');
+  } catch(e) {
+    el.innerHTML = `<div class="empty"><div class="empty-icon">⚠️</div><h3>Couldn't load projects</h3><p>${esc(e.message)}</p></div>`;
+  }
+}
+
+function openNewProjectModal() {
+  document.getElementById('newProjectTitle').value = '';
+  document.getElementById('newProjectDesc').value = '';
+  document.getElementById('newProjectPhase').value = '';
+  renderVentureChips('projectVentureChips', []);
+  document.getElementById('newProjectModal').classList.add('open');
+}
+
+function closeNewProjectModal() {
+  document.getElementById('newProjectModal').classList.remove('open');
+}
+
+async function submitNewProject() {
+  const title = document.getElementById('newProjectTitle').value.trim();
+  if (!title) { toast('Enter a project title', 'error'); return; }
+  const btn = document.querySelector('#newProjectModal .btn-primary');
+  btn.textContent = 'Creating...'; btn.disabled = true;
+  try {
+    await api('/projects', {
+      title,
+      description: document.getElementById('newProjectDesc').value.trim(),
+      phase: document.getElementById('newProjectPhase').value.trim(),
+      venture: getSelectedVentures('projectVentureChips'),
+    });
+    toast('Project created', 'success');
+    closeNewProjectModal();
+    loadProjectsTab();
+  } catch(e) {
+    toast('Failed: ' + e.message, 'error');
+  } finally {
+    btn.textContent = 'Create Project'; btn.disabled = false;
+  }
+}
+
+// Drill into a project — switch to Tasks tab, scoped to this project
+function openProjectDetail(projectId) {
+  projectFilterActive = projectId;
+  const project = allProjects.find(p => p.Project_ID === projectId);
+  showTab('tasks', document.querySelector('.tab-btn[onclick*="tasks"]'));
+  const banner = document.getElementById('projectFilterBanner');
+  banner.style.display = '';
+  banner.querySelector('span').textContent = `📁 Filtered to: ${project ? project.Title : projectId}`;
+  loadTasks();
+}
+
+function clearProjectFilter() {
+  projectFilterActive = '';
+  document.getElementById('projectFilterBanner').style.display = 'none';
+  loadTasks();
+}
+
+
 
 // ── TYPE TOGGLE ───────────────────────────────────────────────────────────────
 function setType(type) {
@@ -883,6 +1252,7 @@ function setModalType(type) {
 // ── MODAL ─────────────────────────────────────────────────────────────────────
 function openCapture() {
   document.getElementById('captureModal').classList.add('open');
+  renderVentureChips('modalVentureChips', []);
   setTimeout(() => document.getElementById('modalText').focus(), 100);
 }
 function closeCapture() {
@@ -899,7 +1269,7 @@ async function submitModal() {
     await api('/capture', {
       type:    modalType,
       text,
-      venture: document.getElementById('modalVenture').value,
+      venture: getSelectedVentures('modalVentureChips'),
       priority:document.getElementById('modalPriority').value,
       source:  'web_ui'
     });
@@ -922,7 +1292,7 @@ async function submitCapture() {
     await api('/capture', {
       type:     captureType,
       text,
-      venture:  document.getElementById('captureVenture').value,
+      venture:  getSelectedVentures('captureVentureChips'),
       location: document.getElementById('captureLocation').value,
       context:  document.getElementById('captureContext').value,
       device:   document.getElementById('captureDevice').value,
@@ -1073,8 +1443,8 @@ function renderTable() {
         <td>
           <select onchange="batchEdit(${i},'venture',this.value)" style="min-width:90px;">
             <option value="">—</option>
-            ${['ridge_co','barrel_co','handyman','cabin','personal','multiple'].map(v =>
-              `<option value="${v}" ${venture===v?'selected':''}>${fmtVenture(v)}</option>`
+            ${allVentures.map(v =>
+              `<option value="${esc(v.Venture_Code)}" ${venture===v.Venture_Code?'selected':''}>${esc(v.Venture_Name)}</option>`
             ).join('')}
           </select>
         </td>
@@ -1153,8 +1523,8 @@ function renderCard() {
         <label class="form-label">Venture</label>
         <select onchange="batchEdit(${cardIndex},'venture',this.value)">
           <option value="">—</option>
-          ${['ridge_co','barrel_co','handyman','cabin','personal','multiple'].map(v =>
-            `<option value="${v}" ${venture===v?'selected':''}>${fmtVenture(v)}</option>`
+          ${allVentures.map(v =>
+            `<option value="${esc(v.Venture_Code)}" ${venture===v.Venture_Code?'selected':''}>${esc(v.Venture_Name)}</option>`
           ).join('')}
         </select>
       </div>
@@ -1321,6 +1691,9 @@ async function saveBatch() {
 async function loadTasks() {
   const el = document.getElementById('tasksList');
   el.innerHTML = '<div class="loading-row"><div class="spinner"></div> Loading tasks...</div>';
+  if (allVentures.length === 0) await loadVentures();
+  if (allProjects.length === 0) await loadProjects();
+  populateVentureFilter();
   try {
     const params = new URLSearchParams();
     const v = document.getElementById('filterVenture').value;
@@ -1331,43 +1704,128 @@ async function loadTasks() {
     if (s) params.set('status', s);
     if (d) params.set('device', d);
     if (p) params.set('priority', p);
+    if (projectFilterActive) params.set('project', projectFilterActive);
 
     const data = await api('/tasks?' + params.toString(), null, 'GET');
     const tasks = data.tasks || [];
+    window._tasksCache = tasks;
 
     if (tasks.length === 0) {
       el.innerHTML = `<div class="empty"><div class="empty-icon">✅</div><h3>No tasks yet</h3><p>Capture your first task using the Capture tab.</p></div>`;
       return;
     }
 
-    el.innerHTML = tasks.map(t => `
+    el.innerHTML = tasks.map((t, i) => {
+      const ventures = (t.Venture || '').split(',').map(x => x.trim()).filter(Boolean);
+      const projects = (t.Project_ID || '').split(',').map(x => x.trim()).filter(Boolean);
+      return `
       <div class="card">
         <div style="display:flex;align-items:flex-start;gap:8px;">
-          <div class="v-dot ${t.Venture || 'multiple'}" style="margin-top:5px;"></div>
           <div style="flex:1;min-width:0;">
             <div class="card-title">${esc(t.Title)}</div>
             ${t.Next_Action ? `<div style="font-size:12px;color:var(--accent);margin-top:3px;">→ ${esc(t.Next_Action)}</div>` : ''}
             <div class="card-meta">
               <span class="tag status-${t.Status}">${fmtStatus(t.Status)}</span>
               ${t.Priority && t.Priority !== 'medium' ? `<span class="tag priority-${t.Priority}">${t.Priority}</span>` : ''}
-              ${t.Venture ? `<span class="tag venture-${t.Venture}">${fmtVenture(t.Venture)}</span>` : ''}
+              ${ventures.map(v => {
+                const vd = allVentures.find(av => av.Venture_Code === v);
+                return `<span class="tag" style="${vd ? `background:${vd.Color}22;color:${vd.Color};` : ''}">${vd ? esc(vd.Venture_Name) : esc(v)}</span>`;
+              }).join('')}
+              ${projects.map(pid => {
+                const pr = allProjects.find(ap => ap.Project_ID === pid);
+                return `<span class="tag">📁 ${pr ? esc(pr.Title) : esc(pid)}</span>`;
+              }).join('')}
               ${t.Device && t.Device !== 'any' ? `<span class="tag">${t.Device === 'phone_ok' ? '📱 Phone OK' : '🖥 Desktop'}</span>` : ''}
               ${t.Context ? `<span class="tag">${fmtContext(t.Context)}</span>` : ''}
               <span style="margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--muted);">${t.Task_ID}</span>
             </div>
+            <div style="margin-top:8px;">
+              <button class="btn btn-secondary btn-sm" onclick="openTaskEdit(${i})">✏️ Edit</button>
+            </div>
           </div>
         </div>
       </div>
-    `).join('');
+    `; }).join('');
   } catch(e) {
     el.innerHTML = `<div class="empty"><div class="empty-icon">⚠️</div><h3>Couldn't load tasks</h3><p>${esc(e.message)}</p></div>`;
   }
 }
 
+function populateVentureFilter() {
+  const sel = document.getElementById('filterVenture');
+  if (!sel) return;
+  const current = sel.value;
+  sel.innerHTML = '<option value="">All ventures</option>' +
+    allVentures.map(v => `<option value="${esc(v.Venture_Code)}">${esc(v.Venture_Name)}</option>`).join('');
+  sel.value = current;
+}
+
+// ── TASK EDIT MODAL ───────────────────────────────────────────────────────────
+let editingTaskIndex = null;
+
+function openTaskEdit(i) {
+  editingTaskIndex = i;
+  const t = window._tasksCache[i];
+  document.getElementById('taskEditTitle').value = t.Title || '';
+  document.getElementById('taskEditStatus').value = t.Status || 'backlog';
+  document.getElementById('taskEditPriority').value = t.Priority || 'medium';
+  document.getElementById('taskEditContext').value = t.Context || '';
+  document.getElementById('taskEditDevice').value = t.Device || 'any';
+  document.getElementById('taskEditNextAction').value = t.Next_Action || '';
+  const selectedVentures = (t.Venture || '').split(',').map(s => s.trim()).filter(Boolean);
+  renderVentureChips('taskEditVentureChips', selectedVentures);
+
+  const selectedProjects = (t.Project_ID || '').split(',').map(s => s.trim()).filter(Boolean);
+  const projEl = document.getElementById('taskEditProjectChips');
+  projEl.innerHTML = allProjects.map(p => `
+    <button type="button" class="venture-chip ${selectedProjects.includes(p.Project_ID) ? 'selected' : ''}"
+      data-code="${esc(p.Project_ID)}" onclick="toggleVentureChip(this, 'var(--accent2)')">${esc(p.Title)}</button>
+  `).join('') || '<span style="font-size:12px;color:var(--muted);">No projects yet — create one in the Projects tab.</span>';
+
+  document.getElementById('taskEditModal').classList.add('open');
+}
+
+function closeTaskEditModal() {
+  document.getElementById('taskEditModal').classList.remove('open');
+  editingTaskIndex = null;
+}
+
+async function submitTaskEdit() {
+  const t = window._tasksCache[editingTaskIndex];
+  const btn = document.querySelector('#taskEditModal .btn-primary');
+  btn.textContent = 'Saving...'; btn.disabled = true;
+  try {
+    await api('/tasks/update', {
+      Task_ID: t.Task_ID,
+      fields: {
+        Title:       document.getElementById('taskEditTitle').value.trim(),
+        Status:      document.getElementById('taskEditStatus').value,
+        Priority:    document.getElementById('taskEditPriority').value,
+        Context:     document.getElementById('taskEditContext').value,
+        Device:      document.getElementById('taskEditDevice').value,
+        Next_Action: document.getElementById('taskEditNextAction').value.trim(),
+        Venture:     getSelectedVentures('taskEditVentureChips'),
+        Project_ID:  getSelectedVentures('taskEditProjectChips'),
+      }
+    });
+    toast('Task updated', 'success');
+    closeTaskEditModal();
+    loadTasks();
+  } catch(e) {
+    toast('Update failed: ' + e.message, 'error');
+  } finally {
+    btn.textContent = 'Save'; btn.disabled = false;
+  }
+}
+
+
+
 // ── LOAD WBM ──────────────────────────────────────────────────────────────────
 async function loadWBM() {
   const el = document.getElementById('wbmList');
   el.innerHTML = '<div class="loading-row"><div class="spinner"></div> Loading...</div>';
+  if (allVentures.length === 0) await loadVentures();
+  if (allProjects.length === 0) await loadProjects();
   try {
     const status = document.getElementById('filterWBMStatus').value;
     const params = status ? '?status=' + status : '';
@@ -1379,20 +1837,138 @@ async function loadWBM() {
       return;
     }
 
-    el.innerHTML = items.map(w => `
-      <div class="wbm-card">
+    window._wbmCache = items; // stash for edit/convert lookups
+    el.innerHTML = items.map((w, i) => `
+      <div class="wbm-card" id="wbmCard-${i}">
         <div class="wbm-id">${esc(w.WBM_ID)} · ${esc(w.Capture_Date)}</div>
-        <div style="font-size:13px;margin:5px 0;">${esc(w.Text)}</div>
-        <div class="card-meta">
-          ${w.Venture ? `<span class="tag venture-${w.Venture}">${fmtVenture(w.Venture)}</span>` : ''}
-          ${w.Location ? `<span class="tag">📍 ${esc(w.Location)}</span>` : ''}
-          <span class="tag">${esc(w.Status || 'raw')}</span>
-          <span class="tag">${esc(w.Capture_Method || 'web_ui')}</span>
+
+        <!-- VIEW MODE -->
+        <div id="wbmView-${i}">
+          <div style="font-size:13px;margin:5px 0;">${esc(w.Text)}</div>
+          <div class="card-meta">
+            ${(w.Venture || '').split(',').map(s => s.trim()).filter(Boolean).map(v => {
+              const vd = allVentures.find(av => av.Venture_Code === v);
+              return `<span class="tag" style="${vd ? `background:${vd.Color}22;color:${vd.Color};` : ''}">${vd ? esc(vd.Venture_Name) : esc(v)}</span>`;
+            }).join('')}
+            ${w.Location ? `<span class="tag">📍 ${esc(w.Location)}</span>` : ''}
+            <span class="tag">${esc(w.Status || 'raw')}</span>
+            <span class="tag">${esc(w.Capture_Method || 'web_ui')}</span>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:10px;">
+            <button class="btn btn-secondary btn-sm" onclick="toggleWBMEdit(${i})">✏️ Edit</button>
+            <button class="btn btn-primary btn-sm" onclick="openConvertModal(${i})">✅ Convert to Task</button>
+          </div>
+        </div>
+
+        <!-- EDIT MODE -->
+        <div id="wbmEdit-${i}" style="display:none;">
+          <div class="form-group">
+            <label class="form-label">Text</label>
+            <textarea id="wbmEditText-${i}" rows="2">${esc(w.Text)}</textarea>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Venture(s)</label>
+            <div class="chip-group" id="wbmEditVentureChips-${i}"></div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Status</label>
+            <select id="wbmEditStatus-${i}">
+              ${['raw','processed','converted','dismissed','pattern_only'].map(s =>
+                `<option value="${s}" ${w.Status===s?'selected':''}>${s}</option>`
+              ).join('')}
+            </select>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:6px;">
+            <button class="btn btn-secondary btn-sm" onclick="toggleWBMEdit(${i})">Cancel</button>
+            <button class="btn btn-success btn-sm" onclick="saveWBMEdit(${i})">Save</button>
+          </div>
         </div>
       </div>
     `).join('');
   } catch(e) {
     el.innerHTML = `<div class="empty"><div class="empty-icon">⚠️</div><h3>Couldn't load WBMs</h3><p>${esc(e.message)}</p></div>`;
+  }
+}
+
+// ── WBM EDIT ──────────────────────────────────────────────────────────────────
+function toggleWBMEdit(i) {
+  const view = document.getElementById('wbmView-' + i);
+  const edit = document.getElementById('wbmEdit-' + i);
+  const editing = edit.style.display !== 'none';
+  view.style.display = editing ? '' : 'none';
+  edit.style.display = editing ? 'none' : '';
+  if (!editing) {
+    const w = window._wbmCache[i];
+    const selected = (w.Venture || '').split(',').map(s => s.trim()).filter(Boolean);
+    renderVentureChips('wbmEditVentureChips-' + i, selected);
+  }
+}
+
+async function saveWBMEdit(i) {
+  const w = window._wbmCache[i];
+  const fields = {
+    Text:    document.getElementById('wbmEditText-' + i).value.trim(),
+    Venture: getSelectedVentures('wbmEditVentureChips-' + i),
+    Status:  document.getElementById('wbmEditStatus-' + i).value,
+  };
+  try {
+    await api('/wbm/update', { WBM_ID: w.WBM_ID, fields });
+    toast('WBM updated', 'success');
+    loadWBM();
+  } catch(e) {
+    toast('Update failed: ' + e.message, 'error');
+  }
+}
+
+// ── WBM → TASK CONVERSION ──────────────────────────────────────────────────────
+let convertingIndex = null;
+
+function openConvertModal(i) {
+  convertingIndex = i;
+  const w = window._wbmCache[i];
+  document.getElementById('convertTitle').value = w.Text || '';
+  document.getElementById('convertPriority').value = 'medium';
+  document.getElementById('convertContext').value = '';
+  document.getElementById('convertDevice').value = 'any';
+  document.getElementById('convertNextAction').value = '';
+  const selectedVentures = (w.Venture || '').split(',').map(s => s.trim()).filter(Boolean);
+  renderVentureChips('convertVentureChips', selectedVentures);
+  const projEl = document.getElementById('convertProjectChips');
+  projEl.innerHTML = allProjects.map(p => `
+    <button type="button" class="venture-chip" data-code="${esc(p.Project_ID)}"
+      onclick="toggleVentureChip(this, 'var(--accent2)')">${esc(p.Title)}</button>
+  `).join('') || '<span style="font-size:12px;color:var(--muted);">No projects yet</span>';
+  document.getElementById('convertModal').classList.add('open');
+}
+
+function closeConvertModal() {
+  document.getElementById('convertModal').classList.remove('open');
+  convertingIndex = null;
+}
+
+async function submitConvert() {
+  if (convertingIndex === null) return;
+  const w = window._wbmCache[convertingIndex];
+  const btn = document.querySelector('#convertModal .btn-primary');
+  btn.textContent = 'Converting...'; btn.disabled = true;
+  try {
+    const result = await api('/wbm/convert', {
+      WBM_ID:      w.WBM_ID,
+      title:       document.getElementById('convertTitle').value.trim(),
+      venture:     getSelectedVentures('convertVentureChips'),
+      project_ids: getSelectedVentures('convertProjectChips'),
+      priority:    document.getElementById('convertPriority').value,
+      context:     document.getElementById('convertContext').value,
+      device:      document.getElementById('convertDevice').value,
+      next_action: document.getElementById('convertNextAction').value.trim(),
+    });
+    toast(`✅ Converted to ${result.taskId}`, 'success');
+    closeConvertModal();
+    loadWBM();
+  } catch(e) {
+    toast('Convert failed: ' + e.message, 'error');
+  } finally {
+    btn.textContent = 'Convert to Task'; btn.disabled = false;
   }
 }
 
@@ -1565,6 +2141,18 @@ document.addEventListener('keydown', e => {
 document.getElementById('captureModal').addEventListener('click', e => {
   if (e.target === e.currentTarget) closeCapture();
 });
+
+// ── APP INIT ──────────────────────────────────────────────────────────────────
+async function initApp() {
+  await loadVentures();
+  await loadProjects();
+  renderVentureChips('captureVentureChips', []);
+  populateVentureFilter();
+  const bulkSel = document.getElementById('bulkVenture');
+  bulkSel.innerHTML = '<option value="">— venture (all) —</option>' +
+    allVentures.map(v => `<option value="${esc(v.Venture_Code)}">${esc(v.Venture_Name)}</option>`).join('');
+}
+initApp();
 </script>
 </body>
 </html>
