@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>BrettOS v4.0</title>
+<title>BrettOS v5.0</title>
 <style>
 /* ── TOKENS ────────────────────────────────────────────────────────────────── */
 :root {
@@ -307,6 +307,7 @@ main {
   padding: 0;
 }
 .modal-overlay.open { display: flex; }
+.modal-overlay.nested-modal { z-index: 700; }
 .modal {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -592,9 +593,10 @@ main {
   <header>
     <div>
       <div class="logo">Brett<span>OS</span></div>
-      <div class="version">v4.0 · Phase 4</div>
+      <div class="version">v5.0 · Phase 5</div>
     </div>
     <div class="spacer"></div>
+    <button id="ventureManageBtn" class="btn btn-secondary btn-sm" style="margin-right:8px;" onclick="promptAddVenture(null)">🎨 + Venture</button>
     <button id="quickCaptureBtn" onclick="openCapture()">+ Capture</button>
   </header>
 
@@ -1071,6 +1073,10 @@ main {
       <label class="form-label">Next Action</label>
       <input type="text" id="convertNextAction" placeholder="Single next physical step...">
     </div>
+    <div class="form-group">
+      <label class="form-label">Due Date <span style="font-weight:400;text-transform:none;">(optional)</span></label>
+      <input type="date" id="convertDueDate">
+    </div>
     <button class="btn btn-primary btn-full" onclick="submitConvert()">Convert to Task</button>
   </div>
 </div>
@@ -1079,7 +1085,7 @@ main {
 <div id="toast"></div>
 
 <!-- ── ADD VENTURE MODAL ────────────────────────────────────────────────────── -->
-<div class="modal-overlay" id="addVentureModal">
+<div class="modal-overlay nested-modal" id="addVentureModal">
   <div class="modal">
     <div class="modal-header">
       <span class="modal-title">Add Venture</span>
@@ -1101,7 +1107,7 @@ main {
 <div class="modal-overlay" id="newProjectModal">
   <div class="modal">
     <div class="modal-header">
-      <span class="modal-title">New Project</span>
+      <span class="modal-title" id="projectModalTitle">New Project</span>
       <button class="modal-close" onclick="closeNewProjectModal()">✕</button>
     </div>
     <div class="form-group">
@@ -1112,15 +1118,37 @@ main {
       <label class="form-label">Description</label>
       <textarea id="newProjectDesc" rows="2" placeholder="Optional context..."></textarea>
     </div>
-    <div class="form-group">
-      <label class="form-label">Phase</label>
-      <input type="text" id="newProjectPhase" placeholder="e.g. Foundation, Phase 2...">
+    <div class="form-row" id="newProjectStatusRow" style="display:none;">
+      <div class="form-group">
+        <label class="form-label">Status</label>
+        <select id="newProjectStatus">
+          <option value="active">Active</option>
+          <option value="on_hold">On hold</option>
+          <option value="done">Done</option>
+          <option value="cancelled">Cancelled</option>
+          <option value="someday">Someday</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Phase</label>
+        <input type="text" id="newProjectPhase" placeholder="e.g. Foundation, Phase 2...">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Due Date <span style="font-weight:400;text-transform:none;">(optional)</span></label>
+        <input type="date" id="newProjectDueDate">
+      </div>
     </div>
     <div class="form-group">
       <label class="form-label">Venture(s)</label>
       <div class="chip-group" id="projectVentureChips"></div>
     </div>
-    <button class="btn btn-primary btn-full" onclick="submitNewProject()">Create Project</button>
+    <div class="form-group">
+      <label class="form-label">Depends On <span style="font-weight:400;text-transform:none;">(other projects/tasks that must finish first)</span></label>
+      <div class="chip-group" id="projectDependsChips"></div>
+    </div>
+    <button class="btn btn-primary btn-full" id="projectSubmitBtn" onclick="submitNewProject()">Create Project</button>
   </div>
 </div>
 
@@ -1190,6 +1218,17 @@ main {
     <div class="form-group">
       <label class="form-label">Next Action</label>
       <input type="text" id="taskEditNextAction" placeholder="Single next physical step...">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Due Date <span style="font-weight:400;text-transform:none;">(optional)</span></label>
+      <input type="date" id="taskEditDueDate" onchange="checkTaskDueDateWarning()">
+      <div id="taskDueDateWarning" style="display:none;font-size:11px;color:var(--red);margin-top:5px;">
+        ⚠ Past this task's project due date
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Depends On <span style="font-weight:400;text-transform:none;">(other tasks/projects that must finish first)</span></label>
+      <div class="chip-group" id="taskEditDependsChips"></div>
     </div>
     <button class="btn btn-primary btn-full" onclick="submitTaskEdit()">Save</button>
   </div>
@@ -1267,6 +1306,10 @@ main {
         <label class="form-label">Next Action</label>
         <input type="text" id="devlogConvertNextAction" placeholder="Single next physical step...">
       </div>
+      <div class="form-group">
+        <label class="form-label">Due Date <span style="font-weight:400;text-transform:none;">(optional)</span></label>
+        <input type="date" id="devlogConvertDueDate">
+      </div>
     </div>
 
     <!-- Project-specific fields -->
@@ -1278,6 +1321,10 @@ main {
       <div class="form-group">
         <label class="form-label">Phase</label>
         <input type="text" id="devlogConvertPhase" placeholder="e.g. Foundation, Phase 2...">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Due Date <span style="font-weight:400;text-transform:none;">(optional)</span></label>
+        <input type="date" id="devlogConvertProjectDueDate">
       </div>
     </div>
 
@@ -1358,10 +1405,85 @@ function getSelectedVentures(containerId) {
 // ── ADD VENTURE MODAL ────────────────────────────────────────────────────────
 let addVentureTargetContainer = null;
 
+// ── COLOR SYSTEM ────────────────────────────────────────────────────────────────
+// ROY G BIV base hues, spread for maximum distinguishability. Cycles with an
+// offset once exhausted so later ventures still get visually distinct colors.
+const ROYGBIV_HUES = [0, 30, 55, 130, 210, 265, 300]; // Red Orange Yellow Green Blue Indigo Violet
+const VENTURE_SAT = 65, VENTURE_LIGHT = 55;
+
+function hexToHue(hex) {
+  if (!hex || hex[0] !== '#') return null;
+  const r = parseInt(hex.slice(1,3),16)/255, g = parseInt(hex.slice(3,5),16)/255, b = parseInt(hex.slice(5,7),16)/255;
+  const max = Math.max(r,g,b), min = Math.min(r,g,b), d = max - min;
+  if (d === 0) return 0;
+  let h;
+  if (max === r) h = ((g-b)/d) % 6;
+  else if (max === g) h = (b-r)/d + 2;
+  else h = (r-g)/d + 4;
+  h *= 60;
+  if (h < 0) h += 360;
+  return h;
+}
+
+function hslToHex(h, s, l) {
+  s /= 100; l /= 100;
+  const c = (1 - Math.abs(2*l-1)) * s;
+  const x = c * (1 - Math.abs((h/60) % 2 - 1));
+  const m = l - c/2;
+  let r,g,b;
+  if (h < 60)       [r,g,b] = [c,x,0];
+  else if (h < 120) [r,g,b] = [x,c,0];
+  else if (h < 180) [r,g,b] = [0,c,x];
+  else if (h < 240) [r,g,b] = [0,x,c];
+  else if (h < 300) [r,g,b] = [x,0,c];
+  else              [r,g,b] = [c,0,x];
+  const toHex = v => Math.round((v+m)*255).toString(16).padStart(2,'0');
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+}
+
+// Suggests the next venture color: first unused ROYGBIV hue (>20° from all used hues),
+// falling back to an offset second pass once the base set is exhausted.
+function suggestNextVentureColor() {
+  const usedHues = allVentures.map(v => hexToHue(v.Color)).filter(h => h !== null);
+  const isFarEnough = h => usedHues.every(u => Math.min(Math.abs(h-u), 360-Math.abs(h-u)) > 20);
+  for (const h of ROYGBIV_HUES) {
+    if (isFarEnough(h)) return hslToHex(h, VENTURE_SAT, VENTURE_LIGHT);
+  }
+  // Second pass: offset by 15° per lap around the base set
+  for (let lap = 1; lap <= 6; lap++) {
+    for (const h of ROYGBIV_HUES) {
+      const shifted = (h + lap * 15) % 360;
+      if (isFarEnough(shifted)) return hslToHex(shifted, VENTURE_SAT, VENTURE_LIGHT);
+    }
+  }
+  return hslToHex(Math.random()*360, VENTURE_SAT, VENTURE_LIGHT); // last resort
+}
+
+// Computes a project's display color as a shade of its primary (first) venture's color.
+// Sibling projects under the same venture get progressively different shades so
+// related projects read as "family" while still being distinguishable.
+function getProjectColor(project) {
+  const ventures = (project.Venture || '').split(',').map(s => s.trim()).filter(Boolean);
+  const primaryVenture = allVentures.find(v => v.Venture_Code === ventures[0]);
+  if (!primaryVenture) return '#7b80a0'; // muted fallback — no venture assigned
+  const hue = hexToHue(primaryVenture.Color);
+  if (hue === null) return primaryVenture.Color;
+
+  const siblings = allProjects
+    .filter(p => (p.Venture || '').split(',').map(s => s.trim())[0] === ventures[0])
+    .sort((a, b) => (a.Project_ID || '').localeCompare(b.Project_ID || ''));
+  const idx = Math.max(0, siblings.findIndex(p => p.Project_ID === project.Project_ID));
+
+  // Vary lightness in steps so siblings are visibly different shades of the same hue
+  const shades = [50, 35, 65, 25, 75];
+  const light = shades[idx % shades.length];
+  return hslToHex(hue, VENTURE_SAT, light);
+}
+
 function promptAddVenture(returnToContainerId) {
   addVentureTargetContainer = returnToContainerId;
   document.getElementById('newVentureName').value = '';
-  document.getElementById('newVentureColor').value = '#4f8ef7';
+  document.getElementById('newVentureColor').value = suggestNextVentureColor();
   document.getElementById('addVentureModal').classList.add('open');
   setTimeout(() => document.getElementById('newVentureName').focus(), 100);
 }
@@ -1387,6 +1509,12 @@ async function submitAddVenture() {
       currentlySelected.push(result.code);
       renderVentureChips(addVentureTargetContainer, currentlySelected);
     }
+    // Always refresh the always-visible global pickers so the new venture shows up immediately
+    populateVentureFilter();
+    if (document.getElementById('captureVentureChips')) {
+      const inlineSelected = getSelectedVentures('captureVentureChips');
+      renderVentureChips('captureVentureChips', inlineSelected);
+    }
   } catch(e) {
     toast('Failed: ' + e.message, 'error');
   } finally {
@@ -1395,10 +1523,50 @@ async function submitAddVenture() {
 }
 
 // ── PROJECTS TAB ──────────────────────────────────────────────────────────────
+let allTasksForDeps = []; // lightweight full task list, used only for dependency-status checks
+
+async function ensureTasksForDeps() {
+  if (allTasksForDeps.length === 0) {
+    try {
+      const data = await api('/tasks', null, 'GET');
+      allTasksForDeps = data.tasks || [];
+    } catch(e) { /* non-fatal */ }
+  }
+}
+
+// Resolves a Depends_On CSV field (mix of Task_IDs and Project_IDs) into blocking status
+function resolveDependencyStatus(dependsOnCsv) {
+  const ids = (dependsOnCsv || '').split(',').map(s => s.trim()).filter(Boolean);
+  if (ids.length === 0) return { hasDeps: false, blocked: false, blockers: [] };
+  const blockers = [];
+  for (const id of ids) {
+    if (id.startsWith('BTOS-PRJ')) {
+      const proj = allProjects.find(p => p.Project_ID === id);
+      if (proj && !['done','cancelled'].includes(proj.Status)) blockers.push(proj.Title || id);
+    } else {
+      const task = allTasksForDeps.find(t => t.Task_ID === id);
+      if (task && !['done','cancelled'].includes(task.Status)) blockers.push(task.Title || id);
+    }
+  }
+  return { hasDeps: true, blocked: blockers.length > 0, blockers };
+}
+
+// Checks if a task's own due date falls after the earliest due date of its linked project(s)
+function taskExceedsProjectDueDate(task) {
+  const projectIds = (task.Project_ID || '').split(',').map(s => s.trim()).filter(Boolean);
+  if (!task.Due_Date || projectIds.length === 0) return false;
+  const dueDates = projectIds
+    .map(pid => { const p = allProjects.find(ap => ap.Project_ID === pid); return p && p.Due_Date; })
+    .filter(Boolean);
+  if (dueDates.length === 0) return false;
+  return task.Due_Date > dueDates.sort()[0];
+}
+
 async function loadProjectsTab() {
   const el = document.getElementById('projectsList');
   el.innerHTML = '<div class="loading-row"><div class="spinner"></div> Loading projects...</div>';
   await loadVentures();
+  await ensureTasksForDeps();
   try {
     const data = await api('/projects', null, 'GET');
     allProjects = data.projects || [];
@@ -1410,10 +1578,19 @@ async function loadProjectsTab() {
 
     el.innerHTML = allProjects.map(p => {
       const ventures = (p.Venture || '').split(',').map(s => s.trim()).filter(Boolean);
+      const color = getProjectColor(p);
+      const dep = resolveDependencyStatus(p.Depends_On);
+      const today = new Date().toISOString().split('T')[0];
+      const isOverdue = p.Due_Date && p.Due_Date < today && p.Status === 'active';
       return `
-        <div class="card" style="cursor:pointer;" onclick="openProjectDetail('${esc(p.Project_ID)}')">
-          <div class="card-title">${esc(p.Title)}</div>
-          ${p.Description ? `<div style="font-size:12px;color:var(--muted);margin-top:3px;">${esc(p.Description)}</div>` : ''}
+        <div class="card" style="border-left:3px solid ${color};">
+          <div style="display:flex;align-items:flex-start;gap:8px;">
+            <div style="flex:1;cursor:pointer;" onclick="openProjectDetail('${esc(p.Project_ID)}')">
+              <div class="card-title">${esc(p.Title)}</div>
+              ${p.Description ? `<div style="font-size:12px;color:var(--muted);margin-top:3px;">${esc(p.Description)}</div>` : ''}
+            </div>
+            <button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();openEditProjectModal('${esc(p.Project_ID)}')">✏️ Edit</button>
+          </div>
           <div class="card-meta">
             <span class="tag status-${p.Status === 'active' ? 'in_progress' : 'backlog'}">${esc(p.Status)}</span>
             ${p.Phase ? `<span class="tag">${esc(p.Phase)}</span>` : ''}
@@ -1421,6 +1598,8 @@ async function loadProjectsTab() {
               const vd = allVentures.find(av => av.Venture_Code === v);
               return `<span class="tag" style="${vd ? `background:${vd.Color}22;color:${vd.Color};` : ''}">${vd ? esc(vd.Venture_Name) : esc(v)}</span>`;
             }).join('')}
+            ${p.Due_Date ? `<span class="tag" style="${isOverdue ? 'background:#2b0d0d;color:var(--red);' : ''}">📅 ${esc(p.Due_Date)}${isOverdue ? ' (overdue)' : ''}</span>` : ''}
+            ${dep.blocked ? `<span class="tag" style="background:#2b1a06;color:var(--amber);">🔒 Blocked by: ${dep.blockers.map(esc).join(', ')}</span>` : ''}
             <span style="margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--muted);">${esc(p.Project_ID)}</span>
           </div>
         </div>
@@ -1431,37 +1610,98 @@ async function loadProjectsTab() {
   }
 }
 
+let editingProjectId = null; // null = creating new, set = editing existing
+
 function openNewProjectModal() {
+  editingProjectId = null;
+  document.getElementById('projectModalTitle').textContent = 'New Project';
+  document.getElementById('projectSubmitBtn').textContent = 'Create Project';
   document.getElementById('newProjectTitle').value = '';
   document.getElementById('newProjectDesc').value = '';
   document.getElementById('newProjectPhase').value = '';
+  document.getElementById('newProjectDueDate').value = '';
+  document.getElementById('newProjectStatusRow').style.display = 'none';
   renderVentureChips('projectVentureChips', []);
+  renderProjectDependsChips([]);
   document.getElementById('newProjectModal').classList.add('open');
+}
+
+function openEditProjectModal(projectId) {
+  const p = allProjects.find(pr => pr.Project_ID === projectId);
+  if (!p) return;
+  editingProjectId = projectId;
+  document.getElementById('projectModalTitle').textContent = 'Edit Project';
+  document.getElementById('projectSubmitBtn').textContent = 'Save Changes';
+  document.getElementById('newProjectTitle').value = p.Title || '';
+  document.getElementById('newProjectDesc').value = p.Description || '';
+  document.getElementById('newProjectPhase').value = p.Phase || '';
+  document.getElementById('newProjectDueDate').value = p.Due_Date || '';
+  document.getElementById('newProjectStatusRow').style.display = '';
+  document.getElementById('newProjectStatus').value = p.Status || 'active';
+  const selectedV = (p.Venture || '').split(',').map(s => s.trim()).filter(Boolean);
+  renderVentureChips('projectVentureChips', selectedV);
+  const selectedD = (p.Depends_On || '').split(',').map(s => s.trim()).filter(Boolean);
+  renderProjectDependsChips(selectedD, projectId);
+  document.getElementById('newProjectModal').classList.add('open');
+}
+
+// Depends-on picker: other projects + all tasks, filterable by search box
+function renderProjectDependsChips(selected, excludeProjectId) {
+  const el = document.getElementById('projectDependsChips');
+  const projectOptions = allProjects.filter(p => p.Project_ID !== excludeProjectId);
+  el.innerHTML =
+    projectOptions.map(p => `
+      <button type="button" class="venture-chip ${selected.includes(p.Project_ID) ? 'selected' : ''}"
+        data-code="${esc(p.Project_ID)}" onclick="toggleVentureChip(this, 'var(--accent2)')">📁 ${esc(p.Title)}</button>
+    `).join('') +
+    allTasksForDeps.filter(t => !['done','cancelled'].includes(t.Status)).slice(0, 40).map(t => `
+      <button type="button" class="venture-chip ${selected.includes(t.Task_ID) ? 'selected' : ''}"
+        data-code="${esc(t.Task_ID)}" onclick="toggleVentureChip(this, 'var(--amber)')">✅ ${esc(t.Title)}</button>
+    `).join('');
 }
 
 function closeNewProjectModal() {
   document.getElementById('newProjectModal').classList.remove('open');
+  editingProjectId = null;
 }
 
 async function submitNewProject() {
   const title = document.getElementById('newProjectTitle').value.trim();
   if (!title) { toast('Enter a project title', 'error'); return; }
-  const btn = document.querySelector('#newProjectModal .btn-primary');
-  btn.textContent = 'Creating...'; btn.disabled = true;
+  const btn = document.getElementById('projectSubmitBtn');
+  btn.textContent = editingProjectId ? 'Saving...' : 'Creating...'; btn.disabled = true;
   try {
-    await api('/projects', {
-      title,
-      description: document.getElementById('newProjectDesc').value.trim(),
-      phase: document.getElementById('newProjectPhase').value.trim(),
-      venture: getSelectedVentures('projectVentureChips'),
-    });
-    toast('Project created', 'success');
+    if (editingProjectId) {
+      await api('/projects/update', {
+        Project_ID: editingProjectId,
+        fields: {
+          Title: title,
+          Description: document.getElementById('newProjectDesc').value.trim(),
+          Phase: document.getElementById('newProjectPhase').value.trim(),
+          Due_Date: document.getElementById('newProjectDueDate').value,
+          Status: document.getElementById('newProjectStatus').value,
+          Venture: getSelectedVentures('projectVentureChips'),
+          Depends_On: getSelectedVentures('projectDependsChips'),
+        }
+      });
+      toast('Project updated', 'success');
+    } else {
+      await api('/projects', {
+        title,
+        description: document.getElementById('newProjectDesc').value.trim(),
+        phase: document.getElementById('newProjectPhase').value.trim(),
+        due_date: document.getElementById('newProjectDueDate').value,
+        venture: getSelectedVentures('projectVentureChips'),
+        depends_on: getSelectedVentures('projectDependsChips'),
+      });
+      toast('Project created', 'success');
+    }
     closeNewProjectModal();
     loadProjectsTab();
   } catch(e) {
     toast('Failed: ' + e.message, 'error');
   } finally {
-    btn.textContent = 'Create Project'; btn.disabled = false;
+    btn.textContent = editingProjectId ? 'Save Changes' : 'Create Project'; btn.disabled = false;
   }
 }
 
@@ -1985,6 +2225,7 @@ async function loadTasks() {
   el.innerHTML = '<div class="loading-row"><div class="spinner"></div> Loading tasks...</div>';
   if (allVentures.length === 0) await loadVentures();
   if (allProjects.length === 0) await loadProjects();
+  await ensureTasksForDeps();
   populateVentureFilter();
   try {
     const params = new URLSearchParams();
@@ -2010,6 +2251,10 @@ async function loadTasks() {
     el.innerHTML = tasks.map((t, i) => {
       const ventures = (t.Venture || '').split(',').map(x => x.trim()).filter(Boolean);
       const projects = (t.Project_ID || '').split(',').map(x => x.trim()).filter(Boolean);
+      const today = new Date().toISOString().split('T')[0];
+      const isOverdue = t.Due_Date && t.Due_Date < today && !['done','cancelled'].includes(t.Status);
+      const exceedsProject = taskExceedsProjectDueDate(t);
+      const dep = resolveDependencyStatus(t.Depends_On);
       return `
       <div class="card">
         <div style="display:flex;align-items:flex-start;gap:8px;">
@@ -2025,8 +2270,12 @@ async function loadTasks() {
               }).join('')}
               ${projects.map(pid => {
                 const pr = allProjects.find(ap => ap.Project_ID === pid);
-                return `<span class="tag">📁 ${pr ? esc(pr.Title) : esc(pid)}</span>`;
+                const pc = pr ? getProjectColor(pr) : '#7b80a0';
+                return `<span class="tag" style="background:${pc}22;color:${pc};">📁 ${pr ? esc(pr.Title) : esc(pid)}</span>`;
               }).join('')}
+              ${t.Due_Date ? `<span class="tag" style="${isOverdue ? 'background:#2b0d0d;color:var(--red);' : ''}">📅 ${esc(t.Due_Date)}${isOverdue ? ' (overdue)' : ''}</span>` : ''}
+              ${exceedsProject ? `<span class="tag" style="background:#2b0d0d;color:var(--red);">⚠ Past project due date</span>` : ''}
+              ${dep.blocked ? `<span class="tag" style="background:#2b1a06;color:var(--amber);">🔒 Blocked by: ${dep.blockers.map(esc).join(', ')}</span>` : ''}
               ${t.Device && t.Device !== 'any' ? `<span class="tag">${t.Device === 'phone_ok' ? '📱 Phone OK' : '🖥 Desktop'}</span>` : ''}
               ${t.Context ? `<span class="tag">${fmtContext(t.Context)}</span>` : ''}
               <span style="margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--muted);">${t.Task_ID}</span>
@@ -2064,6 +2313,7 @@ function openTaskEdit(i) {
   document.getElementById('taskEditContext').value = t.Context || '';
   document.getElementById('taskEditDevice').value = t.Device || 'any';
   document.getElementById('taskEditNextAction').value = t.Next_Action || '';
+  document.getElementById('taskEditDueDate').value = t.Due_Date || '';
   const selectedVentures = (t.Venture || '').split(',').map(s => s.trim()).filter(Boolean);
   renderVentureChips('taskEditVentureChips', selectedVentures);
 
@@ -2071,10 +2321,51 @@ function openTaskEdit(i) {
   const projEl = document.getElementById('taskEditProjectChips');
   projEl.innerHTML = allProjects.map(p => `
     <button type="button" class="venture-chip ${selectedProjects.includes(p.Project_ID) ? 'selected' : ''}"
-      data-code="${esc(p.Project_ID)}" onclick="toggleVentureChip(this, 'var(--accent2)')">${esc(p.Title)}</button>
+      data-code="${esc(p.Project_ID)}" onclick="handleTaskProjectChipToggle(this, '${esc(p.Project_ID)}')">${esc(p.Title)}</button>
   `).join('') || '<span style="font-size:12px;color:var(--muted);">No projects yet — create one in the Projects tab.</span>';
 
+  const selectedDeps = (t.Depends_On || '').split(',').map(s => s.trim()).filter(Boolean);
+  const depEl = document.getElementById('taskEditDependsChips');
+  depEl.innerHTML =
+    allProjects.map(p => `
+      <button type="button" class="venture-chip ${selectedDeps.includes(p.Project_ID) ? 'selected' : ''}"
+        data-code="${esc(p.Project_ID)}" onclick="toggleVentureChip(this, 'var(--accent2)')">📁 ${esc(p.Title)}</button>
+    `).join('') +
+    allTasksForDeps.filter(other => other.Task_ID !== t.Task_ID && !['done','cancelled'].includes(other.Status)).slice(0, 40).map(other => `
+      <button type="button" class="venture-chip ${selectedDeps.includes(other.Task_ID) ? 'selected' : ''}"
+        data-code="${esc(other.Task_ID)}" onclick="toggleVentureChip(this, 'var(--amber)')">✅ ${esc(other.Title)}</button>
+    `).join('');
+
   document.getElementById('taskEditModal').classList.add('open');
+  checkTaskDueDateWarning();
+}
+
+// When a project is checked in Task Edit, inherit its venture(s) into the venture
+// picker ONLY if no venture is currently selected — never clobbers a deliberate pick.
+function handleTaskProjectChipToggle(btn, projectId) {
+  const turningOn = !btn.classList.contains('selected');
+  toggleVentureChip(btn, 'var(--accent2)');
+  checkTaskDueDateWarning();
+  if (turningOn) {
+    const currentVentures = getSelectedVentures('taskEditVentureChips');
+    if (currentVentures.length === 0) {
+      const project = allProjects.find(p => p.Project_ID === projectId);
+      const projectVentures = (project?.Venture || '').split(',').map(s => s.trim()).filter(Boolean);
+      if (projectVentures.length) renderVentureChips('taskEditVentureChips', projectVentures);
+    }
+  }
+}
+
+function checkTaskDueDateWarning() {
+  const dueDate = document.getElementById('taskEditDueDate').value;
+  const projectIds = getSelectedVentures('taskEditProjectChips');
+  const warningEl = document.getElementById('taskDueDateWarning');
+  if (!dueDate || projectIds.length === 0) { warningEl.style.display = 'none'; return; }
+  const projectDueDates = projectIds
+    .map(pid => { const p = allProjects.find(ap => ap.Project_ID === pid); return p && p.Due_Date; })
+    .filter(Boolean);
+  const exceeds = projectDueDates.length > 0 && dueDate > projectDueDates.sort()[0];
+  warningEl.style.display = exceeds ? '' : 'none';
 }
 
 function closeTaskEditModal() {
@@ -2098,6 +2389,8 @@ async function submitTaskEdit() {
         Next_Action: document.getElementById('taskEditNextAction').value.trim(),
         Venture:     getSelectedVentures('taskEditVentureChips'),
         Project_ID:  getSelectedVentures('taskEditProjectChips'),
+        Due_Date:    document.getElementById('taskEditDueDate').value,
+        Depends_On:  getSelectedVentures('taskEditDependsChips'),
       }
     });
     toast('Task updated', 'success');
@@ -2147,7 +2440,8 @@ async function loadWBM() {
             }).join('')}
             ${(w.Project_ID || '').split(',').map(s => s.trim()).filter(Boolean).map(pid => {
               const pr = allProjects.find(ap => ap.Project_ID === pid);
-              return `<span class="tag">📁 ${pr ? esc(pr.Title) : esc(pid)}</span>`;
+              const pc = pr ? getProjectColor(pr) : '#7b80a0';
+              return `<span class="tag" style="background:${pc}22;color:${pc};">📁 ${pr ? esc(pr.Title) : esc(pid)}</span>`;
             }).join('')}
             ${w.Location ? `<span class="tag">📍 ${esc(w.Location)}</span>` : ''}
             <span class="tag">${esc(w.Status || 'raw')}</span>
@@ -2305,6 +2599,7 @@ function openConvertModal(i) {
   document.getElementById('convertContext').value = '';
   document.getElementById('convertDevice').value = 'any';
   document.getElementById('convertNextAction').value = '';
+  document.getElementById('convertDueDate').value = '';
   const selectedVentures = (w.Venture || '').split(',').map(s => s.trim()).filter(Boolean);
   renderVentureChips('convertVentureChips', selectedVentures);
   const projEl = document.getElementById('convertProjectChips');
@@ -2335,6 +2630,7 @@ async function submitConvert() {
       context:     document.getElementById('convertContext').value,
       device:      document.getElementById('convertDevice').value,
       next_action: document.getElementById('convertNextAction').value.trim(),
+      due_date:    document.getElementById('convertDueDate').value,
     });
     toast(`✅ Converted to ${result.taskId}`, 'success');
     closeConvertModal();
@@ -2558,6 +2854,8 @@ function openDevLogConvert(i, target) {
   document.getElementById('devlogConvertProjectFields').style.display = target === 'project' ? '' : 'none';
   renderVentureChips('devlogConvertVentureChips', []);
   if (target === 'task') renderProjectChips('devlogConvertProjectChips', []);
+  document.getElementById('devlogConvertDueDate').value = '';
+  document.getElementById('devlogConvertProjectDueDate').value = '';
   document.getElementById('devlogConvertModal').classList.add('open');
 }
 
@@ -2581,9 +2879,11 @@ async function submitDevLogConvert() {
       payload.priority = document.getElementById('devlogConvertPriority').value;
       payload.next_action = document.getElementById('devlogConvertNextAction').value.trim();
       payload.project_ids = getSelectedVentures('devlogConvertProjectChips');
+      payload.due_date = document.getElementById('devlogConvertDueDate').value;
     } else {
       payload.description = document.getElementById('devlogConvertDescription').value.trim();
       payload.phase = document.getElementById('devlogConvertPhase').value.trim();
+      payload.due_date = document.getElementById('devlogConvertProjectDueDate').value;
     }
     const result = await api('/devlog/convert', payload);
     toast(`✅ Converted to ${result.spawnedId}`, 'success');
