@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>BrettOS v1.0</title>
+<title>BrettOS v2.0</title>
 <style>
 /* ── TOKENS ────────────────────────────────────────────────────────────────── */
 :root {
@@ -387,6 +387,173 @@ main {
 .v-dot.cabin    { background: var(--venture-cabin); }
 .v-dot.personal { background: var(--venture-personal); }
 .v-dot.multiple { background: var(--muted); }
+
+/* ── BATCH AI ────────────────────────────────────────────────────────────────── */
+.batch-mode-bar {
+  display: flex;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  margin-bottom: 14px;
+}
+.batch-mode-bar button {
+  flex: 1;
+  padding: 8px 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+  background: none;
+  transition: background 0.15s, color 0.15s;
+}
+.batch-mode-bar button.active { background: var(--accent2); color: #fff; }
+
+/* Table mode */
+.batch-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.batch-table th {
+  text-align: left;
+  padding: 6px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.batch-table td { padding: 6px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
+.batch-table tr.accepted { background: rgba(62,207,142,0.06); }
+.batch-table tr.skipped  { opacity: 0.4; }
+.batch-table input, .batch-table select {
+  padding: 3px 6px;
+  font-size: 12px;
+  min-width: 0;
+  width: 100%;
+}
+.batch-table .row-check { width: 28px; text-align: center; }
+.batch-table .row-check input[type=checkbox] { width: auto; }
+.table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+/* Card mode */
+.batch-card-wrap { position: relative; }
+.batch-card-main {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+}
+.batch-card-original {
+  font-size: 11px;
+  color: var(--muted);
+  font-family: var(--mono);
+  margin-bottom: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+.batch-card-field { margin-bottom: 10px; }
+.batch-card-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+}
+.batch-card-actions .btn { flex: 1; }
+.batch-card-counter {
+  text-align: center;
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 10px;
+}
+.batch-progress-bar {
+  height: 3px;
+  background: var(--border);
+  border-radius: 2px;
+  margin-bottom: 14px;
+  overflow: hidden;
+}
+.batch-progress-fill {
+  height: 100%;
+  background: var(--accent2);
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+
+/* Diff mode */
+.diff-item {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 10px;
+  overflow: hidden;
+}
+.diff-item.accepted { border-color: var(--green); }
+.diff-item.skipped  { opacity: 0.45; }
+.diff-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--surface2);
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+}
+.diff-cols { display: grid; grid-template-columns: 1fr 1fr; }
+.diff-col { padding: 10px 12px; }
+.diff-col:first-child { border-right: 1px solid var(--border); }
+.diff-col-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-bottom: 6px; }
+.diff-original { font-size: 12px; color: var(--muted); font-family: var(--mono); }
+.diff-ai { font-size: 12px; }
+.diff-field { display: flex; gap: 6px; align-items: baseline; margin-top: 4px; font-size: 11px; }
+.diff-field-label { color: var(--muted); flex-shrink: 0; }
+.diff-changed { color: var(--green); font-weight: 600; }
+.diff-actions { display: flex; gap: 8px; padding: 8px 12px; border-top: 1px solid var(--border); }
+
+/* Batch bottom bar */
+.batch-bottom-bar {
+  position: sticky;
+  bottom: 0;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 16px -16px -16px;
+  z-index: 10;
+}
+.batch-accept-count {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--green);
+  flex: 1;
+}
+.batch-insights {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent2);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  margin-bottom: 14px;
+  font-size: 12px;
+}
+.batch-insights-title { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--accent2); margin-bottom: 8px; }
+.batch-insights ul { padding-left: 16px; }
+.batch-insights li { margin-bottom: 4px; color: var(--text); }
+
+/* AI log strip */
+.ai-log-strip {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  font-size: 11px;
+  color: var(--muted);
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+  font-family: var(--mono);
+}
+.ai-log-strip span b { color: var(--text); }
 </style>
 </head>
 <body>
@@ -396,7 +563,7 @@ main {
   <header>
     <div>
       <div class="logo">Brett<span>OS</span></div>
-      <div class="version">v1.0 · Phase 1</div>
+      <div class="version">v2.0 · Phase 2</div>
     </div>
     <div class="spacer"></div>
     <button id="quickCaptureBtn" onclick="openCapture()">+ Capture</button>
@@ -408,6 +575,7 @@ main {
     <button class="tab-btn" onclick="showTab('tasks', this)">✅ Tasks</button>
     <button class="tab-btn" onclick="showTab('wbm', this)">⚡ What Bugs Me</button>
     <button class="tab-btn" onclick="showTab('patterns', this)">🧠 Patterns</button>
+    <button class="tab-btn" id="batchTabBtn" onclick="showTab('batch', this)">🤖 Batch AI</button>
     <button class="tab-btn" onclick="showTab('devlog', this)">📋 Dev Log</button>
   </nav>
 
@@ -517,9 +685,9 @@ main {
 
       <!-- Bulk paste section -->
       <div style="margin-top:28px;">
-        <p class="section-title">Bulk Paste</p>
+        <p class="section-title">Bulk Paste → AI Processor</p>
         <p style="font-size:12px;color:var(--muted);margin-bottom:10px;">
-          Paste multiple items — one per line. All will be saved as WBMs for AI batch processing.
+          Paste multiple items — one per line. Route to AI Batch Processor for single-call tagging and review.
         </p>
         <div class="form-group">
           <textarea id="bulkText" placeholder="Paste items here, one per line..." rows="6"></textarea>
@@ -534,9 +702,11 @@ main {
             <option value="personal">Personal</option>
             <option value="multiple">Multiple</option>
           </select>
-          <button class="btn btn-secondary" onclick="submitBulk()">Save All as WBMs</button>
+          <button class="btn btn-primary" onclick="routeToBatch()">🤖 Process with AI →</button>
         </div>
-        <div id="bulkProgress" style="margin-top:10px;font-size:12px;color:var(--muted);"></div>
+        <p style="font-size:11px;color:var(--muted);margin-top:8px;">
+          Items will be tagged, categorized, and ready for 1-click bulk save.
+        </p>
       </div>
     </div>
 
@@ -611,7 +781,7 @@ main {
       <div id="patternsList"></div>
     </div>
 
-    <!-- ── DEV LOG TAB ──────────────────────────────────────────────────────── -->
+    <!-- ── BATCH AI TAB ─────────────────────────────────────────────────────── -->\n    <div id="tab-batch" class="tab-panel">\n\n      <!-- State: READY (no items loaded yet) -->\n      <div id="batchReady">\n        <p class="section-title">AI Batch Processor</p>\n        <p style="font-size:13px;color:var(--muted);margin-bottom:20px;">\n          Paste items below or route from the Capture tab. One API call processes everything at once.\n        </p>\n        <div class="form-group">\n          <label class="form-label">Items to process (one per line)</label>\n          <textarea id="batchInput" placeholder="Fix barrel pricing strategy&#10;Call lockbox vendor&#10;Update Ridge Co SMS template&#10;Schedule WV cabin deep clean" rows="8"></textarea>\n        </div>\n        <div class="form-row" style="margin-bottom:12px;">\n          <div class="form-group">\n            <label class="form-label">Default Venture</label>\n            <select id="batchVenture">\n              <option value="">— mixed / let AI decide —</option>\n              <option value="ridge_co">Ridge Co</option>\n              <option value="barrel_co">BarrelCo</option>\n              <option value="handyman">Handyman</option>\n              <option value="cabin">WV Cabin</option>\n              <option value="personal">Personal</option>\n            </select>\n          </div>\n          <div class="form-group">\n            <label class="form-label">Treat items as</label>\n            <select id="batchDefaultType">\n              <option value="wbm">WBMs (What Bugs Me)</option>\n              <option value="task">Tasks</option>\n              <option value="auto">Auto-detect</option>\n            </select>\n          </div>\n        </div>\n        <button class="btn btn-primary btn-full" id="batchRunBtn" onclick="runBatch()">\n          🤖 Run AI Batch\n        </button>\n        <p style="font-size:11px;color:var(--muted);margin-top:8px;text-align:center;">\n          Single API call · Tags all items · Detects patterns\n        </p>\n      </div>\n\n      <!-- State: PROCESSING -->\n      <div id="batchProcessing" style="display:none;">\n        <div class="loading-row" style="justify-content:center;padding:48px 0;flex-direction:column;gap:16px;">\n          <div class="spinner" style="width:32px;height:32px;border-width:3px;"></div>\n          <div style="text-align:center;">\n            <div style="font-size:15px;font-weight:600;" id="batchProcessingMsg">Processing items...</div>\n            <div style="font-size:12px;color:var(--muted);margin-top:4px;" id="batchProcessingCount"></div>\n          </div>\n        </div>\n      </div>\n\n      <!-- State: REVIEW -->\n      <div id="batchReview" style="display:none;">\n\n        <!-- AI Log strip -->\n        <div class="ai-log-strip" id="batchAiLogStrip"></div>\n\n        <!-- Batch insights -->\n        <div class="batch-insights" id="batchInsightsBox" style="display:none;">\n          <div class="batch-insights-title">🧠 Batch Insights</div>\n          <div id="batchInsightsContent"></div>\n        </div>\n\n        <!-- Mode toggle -->\n        <div class="batch-mode-bar">\n          <button id="modeTableBtn" class="active" onclick="setBatchMode('table')">📊 Table</button>\n          <button id="modeCardBtn"  onclick="setBatchMode('card')">🃏 Card</button>\n          <button id="modeDiffBtn"  onclick="setBatchMode('diff')">↔ Diff</button>\n        </div>\n\n        <!-- TABLE MODE -->\n        <div id="batchTableMode">\n          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">\n            <button class="btn btn-secondary btn-sm" onclick="selectAllBatch(true)">Select All</button>\n            <button class="btn btn-secondary btn-sm" onclick="selectAllBatch(false)">Deselect All</button>\n            <span style="font-size:12px;color:var(--muted);margin-left:auto;" id="tableSelCount"></span>\n          </div>\n          <div class="table-scroll">\n            <table class="batch-table" id="batchTable">\n              <thead>\n                <tr>\n                  <th class="row-check"><input type="checkbox" id="tableCheckAll" onchange="selectAllBatch(this.checked)"></th>\n                  <th>Title</th>\n                  <th>Type</th>\n                  <th>Venture</th>\n                  <th>Priority</th>\n                  <th>Context</th>\n                  <th>Tags</th>\n                </tr>\n              </thead>\n              <tbody id="batchTableBody"></tbody>\n            </table>\n          </div>\n        </div>\n\n        <!-- CARD MODE -->\n        <div id="batchCardMode" style="display:none;">\n          <div class="batch-card-counter" id="cardCounter"></div>\n          <div class="batch-progress-bar"><div class="batch-progress-fill" id="cardProgressFill"></div></div>\n          <div class="batch-card-wrap">\n            <div class="batch-card-main" id="batchCardContent"></div>\n          </div>\n          <div style="display:flex;justify-content:center;gap:10px;margin-top:14px;">\n            <button class="btn btn-secondary btn-sm" id="cardPrevBtn" onclick="cardNav(-1)">← Prev</button>\n            <button class="btn btn-secondary btn-sm" id="cardNextBtn" onclick="cardNav(1)">Next →</button>\n          </div>\n        </div>\n\n        <!-- DIFF MODE -->\n        <div id="batchDiffMode" style="display:none;">\n          <div id="batchDiffList"></div>\n        </div>\n\n        <!-- Sticky bottom bar -->\n        <div class="batch-bottom-bar">\n          <span class="batch-accept-count" id="batchAcceptCount">0 accepted</span>\n          <button class="btn btn-secondary btn-sm" onclick="resetBatch()">← Start Over</button>\n          <button class="btn btn-success" id="batchSaveBtn" onclick="saveBatch()">💾 Bulk Save</button>\n        </div>\n\n      </div>\n\n    </div>\n\n    <!-- ── DEV LOG TAB ──────────────────────────────────────────────────────── -->
     <div id="tab-devlog" class="tab-panel">
       <p class="section-title">Dev Log — BrettOS Wishlist</p>
 
@@ -769,32 +939,382 @@ async function submitCapture() {
   }
 }
 
-// ── BULK PASTE ────────────────────────────────────────────────────────────────
-async function submitBulk() {
+// ── BULK PASTE → BATCH ROUTER ─────────────────────────────────────────────────
+function routeToBatch() {
   const raw = document.getElementById('bulkText').value.trim();
   if (!raw) { toast('Paste something first', 'error'); return; }
   const venture = document.getElementById('bulkVenture').value;
+  // Pre-fill batch tab
+  document.getElementById('batchInput').value = raw;
+  if (venture) document.getElementById('batchVenture').value = venture;
+  // Switch to batch tab
+  const batchBtn = document.getElementById('batchTabBtn');
+  showTab('batch', batchBtn);
+  toast('Items loaded → ready to run AI', 'success');
+}
+
+// ── BATCH AI STATE ────────────────────────────────────────────────────────────
+let batchItems    = [];   // raw AI output array
+let batchDecisions= {};   // { index: 'accepted'|'skipped' }
+let batchEdits    = {};   // { index: { field: value } }
+let batchMode     = 'table';
+let cardIndex     = 0;
+
+function setBatchMode(mode) {
+  batchMode = mode;
+  ['table','card','diff'].forEach(m => {
+    document.getElementById('mode' + m.charAt(0).toUpperCase() + m.slice(1) + 'Btn').classList.toggle('active', m === mode);
+    document.getElementById('batch' + m.charAt(0).toUpperCase() + m.slice(1) + 'Mode').style.display = m === mode ? '' : 'none';
+  });
+  if (mode === 'table') renderTable();
+  if (mode === 'card')  { cardIndex = 0; renderCard(); }
+  if (mode === 'diff')  renderDiff();
+}
+
+// ── RUN BATCH ─────────────────────────────────────────────────────────────────
+async function runBatch() {
+  const raw = document.getElementById('batchInput').value.trim();
+  if (!raw) { toast('Add items first', 'error'); return; }
   const lines = raw.split('\n').map(l => l.trim()).filter(l => l.length > 0);
   if (lines.length === 0) { toast('No items found', 'error'); return; }
 
-  const prog = document.getElementById('bulkProgress');
-  prog.textContent = `Saving 0 of ${lines.length}...`;
+  const venture = document.getElementById('batchVenture').value;
+  const defaultType = document.getElementById('batchDefaultType').value;
 
-  let saved = 0;
-  for (const line of lines) {
-    try {
-      await api('/capture', { type: 'wbm', text: line, venture, source: 'bulk_paste' });
-      saved++;
-      prog.textContent = `Saving ${saved} of ${lines.length}...`;
-    } catch(e) {
-      console.error('Failed to save:', line, e);
+  // Show processing state
+  document.getElementById('batchReady').style.display = 'none';
+  document.getElementById('batchProcessing').style.display = '';
+  document.getElementById('batchReview').style.display = 'none';
+  document.getElementById('batchProcessingMsg').textContent = `Processing ${lines.length} items...`;
+  document.getElementById('batchProcessingCount').textContent = 'Single AI call · Please wait';
+
+  try {
+    const result = await api('/batch', {
+      items: lines,
+      defaultVenture: venture,
+      defaultType,
+    });
+
+    batchItems     = result.items || [];
+    batchDecisions = {};
+    batchEdits     = {};
+    batchItems.forEach((_, i) => { batchDecisions[i] = 'accepted'; });
+
+    // Render AI log strip
+    if (result.log) {
+      document.getElementById('batchAiLogStrip').innerHTML =
+        `<span>📥 <b>${result.log.input_tokens}</b> in</span>` +
+        `<span>📤 <b>${result.log.output_tokens}</b> out</span>` +
+        `<span>📦 <b>${lines.length}</b> items</span>` +
+        `<span>⏱ <b>${result.log.ms}ms</b></span>`;
     }
-    await sleep(200); // gentle pacing
-  }
 
-  prog.textContent = `✅ Saved ${saved} of ${lines.length} items`;
-  if (saved === lines.length) document.getElementById('bulkText').value = '';
-  toast(`${saved} WBMs saved`, 'success');
+    // Render batch insights
+    const insights = result.batch_insights;
+    if (insights && (insights.patterns_detected?.length || insights.project_clusters?.length || insights.suggested_relationships?.length)) {
+      let html = '';
+      if (insights.patterns_detected?.length) {
+        html += `<div style="margin-bottom:6px;font-weight:600;">Patterns detected:</div><ul>` +
+          insights.patterns_detected.map(p => `<li>${esc(p)}</li>`).join('') + '</ul>';
+      }
+      if (insights.project_clusters?.length) {
+        html += `<div style="margin-bottom:6px;margin-top:8px;font-weight:600;">Project clusters:</div><ul>` +
+          insights.project_clusters.map(p => `<li>${esc(p)}</li>`).join('') + '</ul>';
+      }
+      if (insights.suggested_relationships?.length) {
+        html += `<div style="margin-bottom:6px;margin-top:8px;font-weight:600;">Relationships:</div><ul>` +
+          insights.suggested_relationships.map(p => `<li>${esc(p)}</li>`).join('') + '</ul>';
+      }
+      document.getElementById('batchInsightsContent').innerHTML = html;
+      document.getElementById('batchInsightsBox').style.display = '';
+    } else {
+      document.getElementById('batchInsightsBox').style.display = 'none';
+    }
+
+    // Show review
+    document.getElementById('batchProcessing').style.display = 'none';
+    document.getElementById('batchReview').style.display = '';
+    setBatchMode('table');
+    updateAcceptCount();
+
+  } catch(e) {
+    document.getElementById('batchProcessing').style.display = 'none';
+    document.getElementById('batchReady').style.display = '';
+    toast('Batch failed: ' + e.message, 'error');
+  }
+}
+
+// ── TABLE MODE ────────────────────────────────────────────────────────────────
+function renderTable() {
+  const tbody = document.getElementById('batchTableBody');
+  tbody.innerHTML = batchItems.map((item, i) => {
+    const dec = batchDecisions[i];
+    const ed  = batchEdits[i] || {};
+    const title   = ed.title   ?? item.title   ?? '';
+    const type    = ed.type    ?? item.type    ?? 'wbm';
+    const venture = ed.venture ?? item.venture ?? '';
+    const priority= ed.priority?? item.priority?? 'medium';
+    const context = ed.context ?? item.context ?? '';
+    const tags    = ed.ai_tags ?? (item.ai_tags || []).join(', ');
+    return `
+      <tr class="${dec}" id="tableRow-${i}">
+        <td class="row-check">
+          <input type="checkbox" ${dec === 'accepted' ? 'checked' : ''}
+            onchange="toggleTableRow(${i}, this.checked)">
+        </td>
+        <td><input type="text" value="${esc(title)}" style="min-width:120px;"
+          oninput="batchEdit(${i},'title',this.value)"></td>
+        <td>
+          <select onchange="batchEdit(${i},'type',this.value)">
+            <option value="wbm"  ${type==='wbm'  ?'selected':''}>WBM</option>
+            <option value="task" ${type==='task' ?'selected':''}>Task</option>
+          </select>
+        </td>
+        <td>
+          <select onchange="batchEdit(${i},'venture',this.value)" style="min-width:90px;">
+            <option value="">—</option>
+            ${['ridge_co','barrel_co','handyman','cabin','personal','multiple'].map(v =>
+              `<option value="${v}" ${venture===v?'selected':''}>${fmtVenture(v)}</option>`
+            ).join('')}
+          </select>
+        </td>
+        <td>
+          <select onchange="batchEdit(${i},'priority',this.value)">
+            ${['critical','high','medium','low'].map(p =>
+              `<option value="${p}" ${priority===p?'selected':''}>${p}</option>`
+            ).join('')}
+          </select>
+        </td>
+        <td><input type="text" value="${esc(context)}" placeholder="—" style="min-width:80px;"
+          oninput="batchEdit(${i},'context',this.value)"></td>
+        <td><input type="text" value="${esc(tags)}" placeholder="tags..." style="min-width:100px;"
+          oninput="batchEdit(${i},'ai_tags',this.value)"></td>
+      </tr>`;
+  }).join('');
+  updateTableSelCount();
+}
+
+function toggleTableRow(i, checked) {
+  batchDecisions[i] = checked ? 'accepted' : 'skipped';
+  document.getElementById('tableRow-' + i).className = batchDecisions[i];
+  updateAcceptCount();
+  updateTableSelCount();
+}
+
+function selectAllBatch(val) {
+  batchItems.forEach((_, i) => { batchDecisions[i] = val ? 'accepted' : 'skipped'; });
+  document.getElementById('tableCheckAll').checked = val;
+  renderTable();
+  updateAcceptCount();
+}
+
+function updateTableSelCount() {
+  const count = Object.values(batchDecisions).filter(d => d === 'accepted').length;
+  const el = document.getElementById('tableSelCount');
+  if (el) el.textContent = `${count} of ${batchItems.length} selected`;
+}
+
+// ── CARD MODE ─────────────────────────────────────────────────────────────────
+function renderCard() {
+  const total = batchItems.length;
+  if (total === 0) return;
+  const pct = Math.round(((cardIndex + 1) / total) * 100);
+  document.getElementById('cardCounter').textContent = `Item ${cardIndex + 1} of ${total}`;
+  document.getElementById('cardProgressFill').style.width = pct + '%';
+  document.getElementById('cardPrevBtn').disabled = cardIndex === 0;
+  document.getElementById('cardNextBtn').disabled = cardIndex === total - 1;
+
+  const item = batchItems[cardIndex];
+  const dec  = batchDecisions[cardIndex];
+  const ed   = batchEdits[cardIndex] || {};
+  const title   = ed.title    ?? item.title    ?? '';
+  const type    = ed.type     ?? item.type     ?? 'wbm';
+  const venture = ed.venture  ?? item.venture  ?? '';
+  const priority= ed.priority ?? item.priority ?? 'medium';
+  const context = ed.context  ?? item.context  ?? '';
+  const tags    = ed.ai_tags  ?? (item.ai_tags || []).join(', ');
+  const nextAct = ed.next_action ?? item.next_action ?? '';
+
+  document.getElementById('batchCardContent').innerHTML = `
+    <div class="batch-card-original">Original: ${esc(item._original || title)}</div>
+    <div class="batch-card-field">
+      <label class="form-label">Title</label>
+      <input type="text" value="${esc(title)}" oninput="batchEdit(${cardIndex},'title',this.value)">
+    </div>
+    <div class="form-row">
+      <div class="batch-card-field">
+        <label class="form-label">Type</label>
+        <select onchange="batchEdit(${cardIndex},'type',this.value)">
+          <option value="wbm"  ${type==='wbm' ?'selected':''}>⚡ WBM</option>
+          <option value="task" ${type==='task'?'selected':''}>✅ Task</option>
+        </select>
+      </div>
+      <div class="batch-card-field">
+        <label class="form-label">Venture</label>
+        <select onchange="batchEdit(${cardIndex},'venture',this.value)">
+          <option value="">—</option>
+          ${['ridge_co','barrel_co','handyman','cabin','personal','multiple'].map(v =>
+            `<option value="${v}" ${venture===v?'selected':''}>${fmtVenture(v)}</option>`
+          ).join('')}
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="batch-card-field">
+        <label class="form-label">Priority</label>
+        <select onchange="batchEdit(${cardIndex},'priority',this.value)">
+          ${['critical','high','medium','low'].map(p =>
+            `<option value="${p}" ${priority===p?'selected':''}>${p}</option>`
+          ).join('')}
+        </select>
+      </div>
+      <div class="batch-card-field">
+        <label class="form-label">Context</label>
+        <input type="text" value="${esc(context)}" placeholder="quick_hit, errand..."
+          oninput="batchEdit(${cardIndex},'context',this.value)">
+      </div>
+    </div>
+    <div class="batch-card-field">
+      <label class="form-label">AI Tags</label>
+      <input type="text" value="${esc(tags)}" oninput="batchEdit(${cardIndex},'ai_tags',this.value)">
+    </div>
+    <div class="batch-card-field">
+      <label class="form-label">Next Action</label>
+      <input type="text" value="${esc(nextAct)}" oninput="batchEdit(${cardIndex},'next_action',this.value)">
+    </div>
+    <div class="batch-card-actions">
+      <button class="btn btn-secondary" onclick="cardDecide(${cardIndex},'skipped');cardNav(1);">⏭ Skip</button>
+      <button class="btn btn-success"   onclick="cardDecide(${cardIndex},'accepted');cardNav(1);">✓ Accept</button>
+    </div>
+    <div style="text-align:center;margin-top:8px;font-size:12px;">
+      Status: <b style="color:${dec==='accepted'?'var(--green)':dec==='skipped'?'var(--muted)':'var(--amber)'};">${dec || 'pending'}</b>
+    </div>
+  `;
+}
+
+function cardNav(dir) {
+  cardIndex = Math.max(0, Math.min(batchItems.length - 1, cardIndex + dir));
+  renderCard();
+}
+
+function cardDecide(i, decision) {
+  batchDecisions[i] = decision;
+  updateAcceptCount();
+}
+
+// ── DIFF MODE ─────────────────────────────────────────────────────────────────
+function renderDiff() {
+  const el = document.getElementById('batchDiffList');
+  el.innerHTML = batchItems.map((item, i) => {
+    const dec     = batchDecisions[i];
+    const ed      = batchEdits[i] || {};
+    const original = item._original || item.title || '';
+    const title   = ed.title    ?? item.title    ?? '';
+    const type    = ed.type     ?? item.type     ?? 'wbm';
+    const venture = ed.venture  ?? item.venture  ?? '';
+    const priority= ed.priority ?? item.priority ?? 'medium';
+    const tags    = ed.ai_tags  ?? (item.ai_tags || []).join(', ');
+    const nextAct = ed.next_action ?? item.next_action ?? '';
+    const changed = (title !== original);
+    return `
+      <div class="diff-item ${dec}" id="diffItem-${i}">
+        <div class="diff-header">
+          <span style="font-family:var(--mono);font-size:11px;color:var(--muted);">#${i+1}</span>
+          <span class="tag ${dec==='accepted'?'status-in_progress':dec==='skipped'?'status-done':''}">${dec || 'pending'}</span>
+          <span style="flex:1;"></span>
+          <button class="btn btn-secondary btn-sm" style="padding:3px 8px;" onclick="diffDecide(${i},'skipped')">Skip</button>
+          <button class="btn btn-success btn-sm"   style="padding:3px 8px;margin-left:4px;" onclick="diffDecide(${i},'accepted')">✓ Accept</button>
+        </div>
+        <div class="diff-cols">
+          <div class="diff-col">
+            <div class="diff-col-label">Original</div>
+            <div class="diff-original">${esc(original)}</div>
+          </div>
+          <div class="diff-col">
+            <div class="diff-col-label">AI Output</div>
+            <div class="diff-ai">
+              <div style="font-size:13px;font-weight:600;${changed?'color:var(--green)':''}">${esc(title)}</div>
+              <div class="diff-field"><span class="diff-field-label">type:</span>
+                <span ${type!=='wbm'?'class="diff-changed"':''}>${esc(type)}</span></div>
+              ${venture?`<div class="diff-field"><span class="diff-field-label">venture:</span>
+                <span class="diff-changed">${fmtVenture(venture)}</span></div>`:''}
+              ${priority&&priority!=='medium'?`<div class="diff-field"><span class="diff-field-label">priority:</span>
+                <span class="diff-changed">${esc(priority)}</span></div>`:''}
+              ${tags?`<div class="diff-field"><span class="diff-field-label">tags:</span>
+                <span style="color:var(--muted)">${esc(tags)}</span></div>`:''}
+              ${nextAct?`<div class="diff-field"><span class="diff-field-label">next:</span>
+                <span style="color:var(--accent)">${esc(nextAct)}</span></div>`:''}
+            </div>
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function diffDecide(i, decision) {
+  batchDecisions[i] = decision;
+  const el = document.getElementById('diffItem-' + i);
+  if (el) el.className = 'diff-item ' + decision;
+  updateAcceptCount();
+}
+
+// ── SHARED BATCH HELPERS ──────────────────────────────────────────────────────
+function batchEdit(i, field, value) {
+  if (!batchEdits[i]) batchEdits[i] = {};
+  batchEdits[i][field] = value;
+}
+
+function updateAcceptCount() {
+  const count = Object.values(batchDecisions).filter(d => d === 'accepted').length;
+  const el = document.getElementById('batchAcceptCount');
+  if (el) el.textContent = `${count} of ${batchItems.length} accepted`;
+  updateTableSelCount();
+}
+
+function resetBatch() {
+  batchItems = []; batchDecisions = {}; batchEdits = {}; cardIndex = 0;
+  document.getElementById('batchReady').style.display = '';
+  document.getElementById('batchReview').style.display = 'none';
+  document.getElementById('batchProcessing').style.display = 'none';
+}
+
+// ── BULK SAVE ─────────────────────────────────────────────────────────────────
+async function saveBatch() {
+  const toSave = batchItems
+    .map((item, i) => {
+      if (batchDecisions[i] !== 'accepted') return null;
+      const ed = batchEdits[i] || {};
+      return {
+        type:        ed.type        ?? item.type        ?? 'wbm',
+        title:       ed.title       ?? item.title       ?? '',
+        venture:     ed.venture     ?? item.venture     ?? '',
+        priority:    ed.priority    ?? item.priority    ?? 'medium',
+        context:     ed.context     ?? item.context     ?? '',
+        ai_tags:     ed.ai_tags     ?? (item.ai_tags    || []).join(', '),
+        next_action: ed.next_action ?? item.next_action ?? '',
+        project_suggestion: item.project_suggestion ?? '',
+        _original:   item._original ?? '',
+      };
+    })
+    .filter(Boolean);
+
+  if (toSave.length === 0) { toast('Nothing accepted to save', 'error'); return; }
+
+  const btn = document.getElementById('batchSaveBtn');
+  btn.textContent = 'Saving...'; btn.disabled = true;
+
+  try {
+    const result = await api('/batchSave', { items: toSave });
+    toast(`✅ Saved ${result.saved} items`, 'success');
+    // Clear bulk paste textarea too
+    document.getElementById('bulkText').value = '';
+    document.getElementById('batchInput').value = '';
+    resetBatch();
+  } catch(e) {
+    toast('Save failed: ' + e.message, 'error');
+  } finally {
+    btn.textContent = '💾 Bulk Save'; btn.disabled = false;
+  }
 }
 
 // ── LOAD TASKS ────────────────────────────────────────────────────────────────
