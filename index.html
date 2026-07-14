@@ -609,6 +609,7 @@ main {
     <button class="tab-btn" onclick="showTab('projects', this)">📁 Projects</button>
     <button class="tab-btn" id="batchTabBtn" onclick="showTab('batch', this)">🤖 Batch AI</button>
     <button class="tab-btn" onclick="showTab('devlog', this)">📋 Dev Log</button>
+    <button class="tab-btn" onclick="showTab('integrations', this)">🔗 Integrations</button>
   </nav>
 
   <!-- MAIN CONTENT -->
@@ -979,6 +980,22 @@ main {
       </div>
 
       <div id="devlogList"></div>
+    </div>
+
+    <!-- ── INTEGRATIONS TAB ─────────────────────────────────────────────── -->
+    <div id="tab-integrations" class="tab-panel">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+        <p class="section-title" style="margin:0;">Integrations</p>
+        <button class="btn btn-primary btn-sm" id="syncNowBtn" onclick="syncNow()">↻ Sync Now</button>
+      </div>
+      <p style="font-size:12px;color:var(--muted);margin-bottom:16px;">
+        Pulls property data from Ridge Co, listings from BarrelCo, and your own Contacts into a shared alias index — the thing that lets AI Batch resolve shorthand like "151" to a real property. Runs automatically on a schedule; this button triggers it on demand.
+      </p>
+
+      <div id="syncResultBox" style="display:none;margin-bottom:16px;"></div>
+
+      <p class="section-title" style="margin-top:0;">Recent Sync History</p>
+      <div id="integrationLogList"></div>
     </div>
 
   </main>
@@ -1357,6 +1374,71 @@ function showTab(name, btn) {
   if (name === 'patterns') loadPatterns();
   if (name === 'devlog')   loadDevLog();
   if (name === 'projects') loadProjectsTab();
+  if (name === 'integrations') loadIntegrationLog();
+}
+
+// ── INTEGRATIONS (cross-hub entity sync) ────────────────────────────────────
+const SOURCE_LABELS = { maintenance_hub: 'Ridge Co (Maintenance Hub)', barrelco: 'BarrelCo', contacts: 'Contacts' };
+
+async function syncNow() {
+  const btn = document.getElementById('syncNowBtn');
+  const box = document.getElementById('syncResultBox');
+  btn.textContent = 'Syncing...'; btn.disabled = true;
+  box.style.display = 'none';
+  try {
+    const data = await api('/entities/sync', {});
+    const results = data.results || {};
+    const rows = Object.entries(results).map(([source, r]) => {
+      const label = SOURCE_LABELS[source] || source;
+      if (r.ok) {
+        return `<div class="card" style="border-left:3px solid var(--green);padding:10px 14px;margin-bottom:6px;">
+          <span style="color:var(--green);font-weight:600;">✓ ${esc(label)}</span>
+          <span style="color:var(--muted);margin-left:8px;">${r.count} synced</span>
+        </div>`;
+      }
+      return `<div class="card" style="border-left:3px solid var(--red);padding:10px 14px;margin-bottom:6px;">
+        <span style="color:var(--red);font-weight:600;">✗ ${esc(label)}</span>
+        <span style="color:var(--muted);margin-left:8px;">${esc(r.error)}</span>
+      </div>`;
+    }).join('');
+    box.innerHTML = rows;
+    box.style.display = 'block';
+    const anyFailed = Object.values(results).some(r => !r.ok);
+    toast(anyFailed ? 'Sync completed with errors — see details below' : 'Sync complete ✅', anyFailed ? 'error' : 'success');
+    loadIntegrationLog();
+  } catch(e) {
+    toast('Sync failed: ' + e.message, 'error');
+  } finally {
+    btn.textContent = '↻ Sync Now'; btn.disabled = false;
+  }
+}
+
+async function loadIntegrationLog() {
+  const el = document.getElementById('integrationLogList');
+  el.innerHTML = '<div class="loading-row"><div class="spinner"></div> Loading...</div>';
+  try {
+    const data = await api('/integration-log', null, 'GET');
+    const items = data.log || [];
+    if (items.length === 0) {
+      el.innerHTML = `<div class="empty"><div class="empty-icon">🔗</div><h3>No syncs yet</h3><p>Click "Sync Now" above, or wait for the scheduled run.</p></div>`;
+      return;
+    }
+    el.innerHTML = items.map(l => {
+      const ok = l.Status === 'ok';
+      const label = SOURCE_LABELS[l.Source_Hub] || l.Source_Hub;
+      const ts = l.Timestamp ? new Date(l.Timestamp).toLocaleString('en-US', { month:'short', day:'numeric', hour:'numeric', minute:'2-digit' }) : '';
+      return `
+      <div class="card" style="border-left:3px solid ${ok ? 'var(--green)' : 'var(--red)'};padding:10px 14px;margin-bottom:6px;">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="color:${ok ? 'var(--green)' : 'var(--red)'};font-weight:600;">${ok ? '✓' : '✗'} ${esc(label)}</span>
+          <span style="margin-left:auto;font-size:11px;color:var(--muted);">${esc(ts)}</span>
+        </div>
+        <div style="font-size:12px;color:var(--muted);margin-top:3px;">${esc(l.Detail || '')}</div>
+      </div>`;
+    }).join('');
+  } catch(e) {
+    el.innerHTML = `<div class="empty"><div class="empty-icon">⚠️</div><h3>Couldn't load sync history</h3><p>${esc(e.message)}</p></div>`;
+  }
 }
 
 // ── VENTURES (data-driven) ──────────────────────────────────────────────────────
