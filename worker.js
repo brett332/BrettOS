@@ -61,10 +61,19 @@
  *   scheduled() handler       — Cron Trigger runs /entities/sync automatically (set schedule
  *                                in Cloudflare dashboard → this Worker → Settings → Triggers)
  *
- * NEW ENV VARS NEEDED:
- *   MAINTENANCE_HUB_URL    = https://maintenance-hub.brett-2f8.workers.dev
- *   MAINTENANCE_HUB_SECRET = mh-secret-2026-brett
- *   BARRELCO_URL           = https://barrel-co.brett-2f8.workers.dev
+ * CROSS-WORKER TRANSPORT — SERVICE BINDINGS (fixes Cloudflare error 1042):
+ *   Same-account Worker→Worker calls over the PUBLIC *.workers.dev hostname are
+ *   blocked by Cloudflare (error 1042) — the sync used to fail every run with
+ *   "Unexpected token 'e', 'error code: 1042 ' is not valid JSON". Fix: reach the
+ *   sibling Workers through Service Bindings declared in wrangler.toml:
+ *       [[services]] binding = "MAINTENANCE_HUB"  service = "maintenance-hub"
+ *       [[services]] binding = "BARRELCO"         service = "barrel-co"
+ *   Bindings route internally (never touch the public edge), so 1042 never fires.
+ *
+ * ENV VARS (dashboard):
+ *   MAINTENANCE_HUB_SECRET = mh-secret-2026-brett   (auth header for the hub feed)
+ *   MAINTENANCE_HUB_URL / BARRELCO_URL  = optional public-URL FALLBACK only; the
+ *                                         Service Bindings above are the live path.
  *
  * SCHEMA NOTE: three new tabs needed —
  *   Entities         : Entity_ID | Entity_Type | Display_Name | Aliases | Source_Hub | Source_ID | Venture | Deep_Link_Hash | Last_Synced
@@ -950,16 +959,35 @@ async function handleWBMConvert(request, env) {
 // shape, replaces this Worker's copy of each source's entities, and logs every
 // attempt — success or failure — to Integration_Log so breakage is visible, not silent.
 
+// Cross-Worker fetch that AVOIDS Cloudflare error 1042. On the same Cloudflare
+// account, one Worker fetching another Worker's PUBLIC hostname (*.workers.dev)
+// is blocked as a loop; Cloudflare returns an HTML error page ("error code:
+// 1042"), which then breaks res.json() with "Unexpected token 'e'...". The fix
+// is a Service Binding: env.MAINTENANCE_HUB / env.BARRELCO route Worker→Worker
+// INTERNALLY (never hitting the public edge), so 1042 never triggers. We prefer
+// the binding and fall back to the public URL only if the binding isn't wired
+// (e.g. local dev before `wrangler dev` service config), so this degrades safely.
+async function feedFetch(binding, publicUrl, path, headers = {}) {
+  if (binding && typeof binding.fetch === 'function') {
+    // Host is irrelevant for a service binding — only the path/headers matter.
+    return binding.fetch(new Request(`https://internal${path}`, { headers }));
+  }
+  if (!publicUrl) {
+    throw new Error('No service binding present and no public URL configured (set the [[services]] binding in wrangler.toml)');
+  }
+  return fetch(`${publicUrl}${path}`, { headers });
+}
+
 async function handleEntitiesSync(env) {
   const token = await getAccessToken(env);
   const results = {};
 
   // ── Maintenance Hub (properties) ──
   try {
-    if (!env.MAINTENANCE_HUB_URL) throw new Error('MAINTENANCE_HUB_URL env var not set');
-    const res = await fetch(`${env.MAINTENANCE_HUB_URL}/public/entities-feed`, {
-      headers: { 'X-Auth-Token': env.MAINTENANCE_HUB_SECRET || '' },
-    });
+    const res = await feedFetch(
+      env.MAINTENANCE_HUB, env.MAINTENANCE_HUB_URL, '/public/entities-feed',
+      { 'X-Auth-Token': env.MAINTENANCE_HUB_SECRET || '' },
+    );
     const data = await res.json();
     if (!res.ok) throw new Error(`HTTP ${res.status}: ${data.error || 'unknown error'}`);
     if (data.version !== 1) throw new Error(`Unexpected feed version: got ${data.version}, expected 1`);
@@ -982,8 +1010,7 @@ async function handleEntitiesSync(env) {
 
   // ── BarrelCo (listings) ──
   try {
-    if (!env.BARRELCO_URL) throw new Error('BARRELCO_URL env var not set');
-    const res = await fetch(`${env.BARRELCO_URL}/public/entities-feed`);
+    const res = await feedFetch(env.BARRELCO, env.BARRELCO_URL, '/public/entities-feed');
     const data = await res.json();
     if (!res.ok) throw new Error(`HTTP ${res.status}: ${data.error || 'unknown error'}`);
     if (data.version !== 1) throw new Error(`Unexpected feed version: got ${data.version}, expected 1`);

@@ -1,0 +1,28 @@
+# Cloudflare Worker deploy config for BrettOS.
+# Purpose: (1) enable push-to-main auto-deploy via Cloudflare Workers Builds,
+#          (2) declare the Service Bindings that fix Cloudflare error 1042.
+#
+# keep_vars = true is CRITICAL — it preserves the env vars and secrets set in
+# the Cloudflare dashboard (GOOGLE service-account key, SHEET_ID, ANTHROPIC_API_KEY,
+# MAINTENANCE_HUB_SECRET, etc.) so a deploy never wipes them.
+
+name = "brett-os"
+main = "worker.js"
+compatibility_date = "2026-06-08"
+keep_vars = true
+workers_dev = true
+
+# ── SERVICE BINDINGS (fix for error 1042) ──────────────────────────────────────
+# Same-account Worker→Worker calls over the public *.workers.dev hostname are
+# blocked by Cloudflare (1042). These bindings route the /entities/sync calls to
+# the sibling Workers INTERNALLY. `service` must match each target Worker's
+# deployed name exactly (maintenance-hub, barrel-co).
+[[services]]
+binding = "MAINTENANCE_HUB"
+service = "maintenance-hub"
+
+[[services]]
+binding = "BARRELCO"
+service = "barrel-co"
+
+# Git auto-deploy connected via Cloudflare Workers Builds.
