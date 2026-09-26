@@ -1,0 +1,34 @@
+name: Deploy Tasks Sync Apps Script
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps-script/tasks-sync/**'
+  workflow_dispatch: {}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install clasp
+        run: npm install -g @google/clasp
+
+      - name: Restore clasp credentials
+        run: echo "$CLASP_CREDENTIALS" > "$HOME/.clasprc.json"
+        env:
+          CLASP_CREDENTIALS: ${{ secrets.CLASP_CREDENTIALS }}
+
+      - name: Push and deploy
+        working-directory: apps-script/tasks-sync
+        run: |
+          clasp push --force
+          clasp deploy -i AKfycbw9-FjmVfm86mQpzjvTDzrnHOy1HGCGvR4MIVBbEK6yHiYOoIaK1PQ0MWDCzhCEWLpT -d "auto-deploy $(date -u +%Y-%m-%dT%H:%M:%SZ)"
