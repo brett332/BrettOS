@@ -476,12 +476,16 @@ const STOPWORDS_ = new Set(['the','a','an','to','for','of','and','or','in','on',
   'it','with','from','need','get','buy','pick','up','please','remind','me','about']);
 
 /** Suggests a single keyword from a task's title for the review page to pre-fill —
- *  picks the longest non-stopword word, which is usually the most distinctive one
- *  (e.g. "propane" out of "grab propane for the cabin"). Brett can edit it before saving. */
+ *  picks the longest non-stopword, non-purely-numeric word, which is usually the most
+ *  distinctive one (e.g. "propane" out of "grab propane for the cabin"). Purely numeric
+ *  tokens (dates, times, quantities like "09262026" or "0557pm") are excluded — they'd
+ *  otherwise often win on length alone while being useless as a learned-rule keyword.
+ *  Brett can edit the suggestion before saving either way. */
 function suggestKeyword_(title) {
   const words = (title || '').toLowerCase().replace(/[^a-z0-9\s'-]/g, '').split(/\s+/).filter(Boolean);
-  const candidates = words.filter(w => w.length > 2 && !STOPWORDS_.has(w));
-  if (!candidates.length) return words[0] || '';
+  const isMostlyNumeric = w => (w.match(/[0-9]/g) || []).length >= w.replace(/[^a-z0-9]/g, '').length / 2;
+  const candidates = words.filter(w => w.length > 2 && !STOPWORDS_.has(w) && !isMostlyNumeric(w));
+  if (!candidates.length) return words.find(w => !isMostlyNumeric(w)) || '';
   candidates.sort((a, b) => b.length - a.length);
   return candidates[0];
 }
