@@ -75,7 +75,7 @@
  * rather than minting a new one). See .clasp.json for the bound scriptId. The first CI run
  * failed because the pasted OAuth credentials secret got corrupted by copy/paste — the
  * secret is now stored base64-encoded (CLASP_CREDENTIALS_B64) to avoid that.
- * (redeploy trigger: CLASP_CREDENTIALS_B64 re-saved without trailing shell-prompt text)
+ * (redeploy trigger: Apps Script API enabled at script.google.com/home/usersettings)
  *
  * ---------------------------------------------------------------------------------
  * ONE-TIME SETUP (already done — kept here for reference)
