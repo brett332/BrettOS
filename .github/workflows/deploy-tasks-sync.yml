@@ -23,9 +23,18 @@ jobs:
         run: npm install -g @google/clasp
 
       - name: Restore clasp credentials
-        run: echo "$CLASP_CREDENTIALS" > "$HOME/.clasprc.json"
+        run: |
+          # CLASP_CREDENTIALS is stored as base64 of ~/.clasprc.json so that
+          # copy/paste into the GitHub Secrets UI can't corrupt the JSON
+          # with stray line breaks or whitespace (this is what broke the
+          # first run: clasp failed with "Expected ',' or '}' after
+          # property value in JSON at position 631").
+          echo "$CLASP_CREDENTIALS_B64" | base64 -d > "$HOME/.clasprc.json"
+          node -e "JSON.parse(require('fs').readFileSync(process.env.HOME + '/.clasprc.json', 'utf8'))" \
+            && echo "Credentials file is valid JSON." \
+            || (echo "::error::~/.clasprc.json is not valid JSON after decoding CLASP_CREDENTIALS_B64 — the secret needs to be re-set (see repo notes)." && exit 1)
         env:
-          CLASP_CREDENTIALS: ${{ secrets.CLASP_CREDENTIALS }}
+          CLASP_CREDENTIALS_B64: ${{ secrets.CLASP_CREDENTIALS_B64 }}
 
       - name: Push and deploy
         working-directory: apps-script/tasks-sync
