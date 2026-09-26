@@ -72,7 +72,9 @@
  * same auto-deploy shape as the RidgeCo Hub's Cloudflare Workers Builds. Edit this file (or
  * have Claude edit it) and push; the live web app + triggers pick it up automatically via
  * `clasp push` + `clasp deploy -i <deploymentId>` (updates the existing deployment/URL
- * rather than minting a new one). See .clasp.json for the bound scriptId.
+ * rather than minting a new one). See .clasp.json for the bound scriptId. The first CI run
+ * failed because the pasted OAuth credentials secret got corrupted by copy/paste — the
+ * secret is now stored base64-encoded (CLASP_CREDENTIALS_B64) to avoid that.
  *
  * ---------------------------------------------------------------------------------
  * ONE-TIME SETUP (already done — kept here for reference)
