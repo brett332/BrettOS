@@ -75,6 +75,7 @@
  * rather than minting a new one). See .clasp.json for the bound scriptId. The first CI run
  * failed because the pasted OAuth credentials secret got corrupted by copy/paste — the
  * secret is now stored base64-encoded (CLASP_CREDENTIALS_B64) to avoid that.
+ * (redeploy trigger: CLASP_CREDENTIALS_B64 re-set Sep 26 2026)
  *
  * ---------------------------------------------------------------------------------
  * ONE-TIME SETUP (already done — kept here for reference)
