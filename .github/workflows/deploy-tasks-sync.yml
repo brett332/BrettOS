@@ -44,4 +44,4 @@ jobs:
         working-directory: apps-script/tasks-sync
         run: |
           clasp push --force
-          clasp deploy -i AKfycbw9-FjmVfm86mQpzjvTDzrnHOy1HGCGvR4MIVBbEK6yHiYOoIaK1PQ0MWDCzhCEWLpT -d "auto-deploy $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          clasp deploy -i AKfycbwboTdUJ3datXm7R2XTn3gyaYPxhEWbz7iIPyAZJvO-b3RaOo8zueFZqQGxTT6loPGsug -d "auto-deploy $(date -u +%Y-%m-%dT%H:%M:%SZ)"
