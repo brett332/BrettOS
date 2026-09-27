@@ -65,6 +65,30 @@
  *     gives you a URL to bookmark/add to your phone's home screen — no Sheets UI involved.
  * Net effect: the set of things you have to manually resolve shrinks every time you use it.
  *
+ * WHY THIS VERSION ADDS THE PROJECT TASKS TAB PUSH/PULL (Sep 27 2026):
+ * The "Tasks" tab (separate from Tasks_Sync above) is Brett's real project-task database —
+ * Task_ID, Title, Description, Status, Project_ID, Venture, Priority, Next_Action,
+ * Depends_On, List_Category, etc. — richer than anything Google Tasks can hold. THIS tab
+ * stays the source of truth; Google Tasks is a phone-readable mirror, not a place to edit
+ * details. Two-way, but asymmetric:
+ *   - Sheet -> Google (push): any row with a List_Category and a Status other than
+ *     "cancelled" gets created/updated in the Google Tasks list named by its List_Category
+ *     (created if needed — same getOrCreateListId_() used by the routing system above).
+ *     Description + Next_Action + Depends_On + a compact "[Venture · Priority · Project]"
+ *     footer + the sheet's own Task_ID go into the Google Task's Notes, so context survives
+ *     even when you're just looking at your phone. Cancelled rows are never pushed — skip
+ *     them in the sheet and that's the end of it, no Google Tasks cleanup needed.
+ *   - Google -> Sheet (pull): the ONLY thing that flows back is completion. If a task this
+ *     script pushed (matched strictly by its own Google_Task_ID, so nothing else in your
+ *     Tasks account is ever touched) shows completed=true, Status flips to "done" and
+ *     Completed_Date is stamped in the sheet. Nothing else about the row is ever overwritten
+ *     from the Google side — editing a task's title/notes/due date in the Tasks app does NOT
+ *     flow back; the sheet stays authoritative for everything except done/not-done.
+ * Google_Task_ID + Google_List_ID (columns W/X) are the tracking pair that make repeat runs
+ * idempotent — a row with a Google_Task_ID is patched in place, never re-created. New rows
+ * you add later push automatically on the next 5-min poll (or immediately via the onEdit
+ * trigger) as soon as they have a List_Category — leave it blank to keep a row sheet-only.
+ *
  * WHY THIS FILE NOW LIVES IN GITHUB (Sep 26 2026):
  * Deploying via the Apps Script editor UI required a manual "New version -> Deploy" click
  * every time the code changed. This file is now the source of truth, pushed to the live
@@ -148,11 +172,14 @@ function setup() {
   ensureTab_();
   ensureRulesTab_();
   ensureEmailLabels_();
+  ensureProjectTaskColumns_();
   ScriptApp.getProjectTriggers().forEach(t => ScriptApp.deleteTrigger(t)); // avoid dupes on re-run
   ScriptApp.newTrigger('pollAll').timeBased().everyMinutes(5).create();
   ScriptApp.newTrigger('processEmailToTasks').timeBased().everyMinutes(5).create();
   ScriptApp.newTrigger('onSheetEdit').forSpreadsheet(SpreadsheetApp.getActive()).onEdit().create();
-  Logger.log('Setup complete: Tasks_Sync + Category_Rules tabs ready, 5-min routing+sync poll + 5-min email-capture poll + onEdit trigger installed. Deploy as a Web App (see file header) to get the review page.');
+  ScriptApp.newTrigger('pollProjectTasks').timeBased().everyMinutes(5).create();
+  ScriptApp.newTrigger('onProjectTasksEdit').forSpreadsheet(SpreadsheetApp.getActive()).onEdit().create();
+  Logger.log('Setup complete: Tasks_Sync + Category_Rules tabs ready, 5-min routing+sync poll + 5-min email-capture poll + onEdit trigger + 5-min project-task push/pull poll + project-task onEdit trigger installed. Deploy as a Web App (see file header) to get the review page.');
 }
 
 function ensureTab_() {
@@ -464,6 +491,183 @@ function createTask(title, notes, category) {
   const created = Tasks.Tasks.insert({ title, notes: notes || '' }, taskListId);
   pollAll();
   return created;
+}
+
+// ===================================================================================
+// PROJECT TASKS TAB — push/pull between the "Tasks" tab (rich project-task database,
+// separate from the Tasks_Sync mirror above) and Google Tasks. See file header for the
+// full design note. This tab stays the source of truth; only completion flows back.
+// ===================================================================================
+
+const PROJECT_TAB_NAME = 'Tasks';
+const PROJECT_COLS = {
+  Task_ID: 1, Title: 2, Description: 3, Status: 4, Project_ID: 5, Venture: 6,
+  Context: 7, Device: 8, Location_Tags: 9, Energy: 10, Priority: 11, AI_Tags: 12,
+  Source: 13, WBM_ID: 14, Due_Date: 15, Created_Date: 16, Completed_Date: 17,
+  Notes: 18, Next_Action: 19, Depends_On: 20, Linked_Entities: 21, List_Category: 22,
+  Google_Task_ID: 23, Google_List_ID: 24
+};
+// Status values (lowercased) that are never pushed/touched at all.
+const PROJECT_STATUS_SKIP = ['cancelled'];
+// Status values that mean "done" — either direction. Sheet edits to any of these push a
+// completed Google Task; a completed Google Task pulls back as 'done' specifically.
+const PROJECT_STATUS_DONE = ['done', 'completed'];
+
+/** Adds the Google_Task_ID / Google_List_ID tracking columns to the Tasks tab if they're
+ *  not already there. Idempotent — safe to call on every run. Never touches any other
+ *  column or any existing row's data. */
+function ensureProjectTaskColumns_() {
+  const ss = SpreadsheetApp.getActive();
+  const sheet = ss.getSheetByName(PROJECT_TAB_NAME);
+  if (!sheet) {
+    Logger.log(`"${PROJECT_TAB_NAME}" tab not found — skipping project-task columns setup.`);
+    return null;
+  }
+  const header = sheet.getRange(1, 1, 1, PROJECT_COLS.Google_List_ID).getValues()[0];
+  if (!header[PROJECT_COLS.Google_Task_ID - 1]) {
+    sheet.getRange(1, PROJECT_COLS.Google_Task_ID).setValue('Google_Task_ID');
+  }
+  if (!header[PROJECT_COLS.Google_List_ID - 1]) {
+    sheet.getRange(1, PROJECT_COLS.Google_List_ID).setValue('Google_List_ID');
+  }
+  return sheet;
+}
+
+/** Builds the Google Task Notes body: Description, Next_Action, Depends_On, then a compact
+ *  "[Venture · Priority · Project]" footer, then the sheet's own Task_ID for traceability. */
+function buildProjectTaskNotes_(row) {
+  const description = row[PROJECT_COLS.Description - 1];
+  const nextAction = row[PROJECT_COLS.Next_Action - 1];
+  const dependsOn = row[PROJECT_COLS.Depends_On - 1];
+  const venture = row[PROJECT_COLS.Venture - 1];
+  const priority = row[PROJECT_COLS.Priority - 1];
+  const project = row[PROJECT_COLS.Project_ID - 1];
+  const taskId = row[PROJECT_COLS.Task_ID - 1];
+
+  const parts = [];
+  if (description) parts.push(String(description));
+  if (nextAction) parts.push(`Next: ${nextAction}`);
+  if (dependsOn) parts.push(`Depends on: ${dependsOn}`);
+
+  const footerBits = [];
+  if (venture) footerBits.push(String(venture));
+  if (priority) footerBits.push(`${priority} priority`);
+  if (project) footerBits.push(String(project));
+  if (footerBits.length) parts.push(`[${footerBits.join(' · ')}]`);
+  if (taskId) parts.push(String(taskId));
+
+  return parts.join('\n\n');
+}
+
+/** Sheet -> Google Tasks. Every row with a List_Category and a non-"cancelled" Status gets
+ *  created (first push) or patched in place (repeat pushes, matched by Google_Task_ID —
+ *  never re-created, so this is safe to run on every poll). Rows with no List_Category are
+ *  left alone — nothing to route into yet. */
+function pushProjectTasksToGoogle_() {
+  const sheet = ensureProjectTaskColumns_();
+  if (!sheet) return;
+  const data = sheet.getDataRange().getValues();
+
+  for (let r = 1; r < data.length; r++) {
+    const row = data[r];
+    const title = row[PROJECT_COLS.Title - 1];
+    if (!title) continue;
+
+    const status = String(row[PROJECT_COLS.Status - 1] || '').toLowerCase();
+    if (PROJECT_STATUS_SKIP.includes(status)) continue; // cancelled — never pushed
+
+    const listCategory = String(row[PROJECT_COLS.List_Category - 1] || '').trim();
+    if (!listCategory) continue; // not categorized yet — leave sheet-only for now
+
+    const existingTaskId = row[PROJECT_COLS.Google_Task_ID - 1];
+    const existingListId = row[PROJECT_COLS.Google_List_ID - 1];
+    const isDone = PROJECT_STATUS_DONE.includes(status);
+    const notes = buildProjectTaskNotes_(row);
+
+    let due = null;
+    const dueRaw = row[PROJECT_COLS.Due_Date - 1];
+    if (dueRaw) {
+      const d = new Date(dueRaw);
+      if (!isNaN(d.getTime())) due = d.toISOString();
+    }
+
+    try {
+      const destId = getOrCreateListId_(listCategory);
+
+      if (!existingTaskId) {
+        const created = Tasks.Tasks.insert(
+          { title: title, notes: notes, status: isDone ? 'completed' : 'needsAction', due: due },
+          destId
+        );
+        sheet.getRange(r + 1, PROJECT_COLS.Google_Task_ID).setValue(created.id);
+        sheet.getRange(r + 1, PROJECT_COLS.Google_List_ID).setValue(destId);
+        Logger.log(`Pushed new project task "${title}" -> "${listCategory}" (${created.id})`);
+      } else {
+        let taskListId = existingListId || destId;
+        if (destId !== existingListId) {
+          Tasks.Tasks.move(existingListId, existingTaskId, { destinationTasklist: destId });
+          taskListId = destId;
+          sheet.getRange(r + 1, PROJECT_COLS.Google_List_ID).setValue(destId);
+          Logger.log(`Moved project task "${title}" -> "${listCategory}"`);
+        }
+        Tasks.Tasks.patch(
+          { title: title, notes: notes, status: isDone ? 'completed' : 'needsAction', due: due },
+          taskListId,
+          existingTaskId
+        );
+      }
+    } catch (err) {
+      Logger.log(`Failed to push project task row ${r + 1} ("${title}"): ${err}`);
+    }
+  }
+}
+
+/** Google Tasks -> Sheet, completion only. Only ever reads tasks this script itself
+ *  created (matched strictly by the row's own Google_Task_ID/Google_List_ID) — never
+ *  scans or touches anything else in the Tasks account. If completed, flips Status to
+ *  "done" and stamps Completed_Date; nothing else about the row is ever overwritten. */
+function pullProjectTaskCompletions_() {
+  const sheet = ensureProjectTaskColumns_();
+  if (!sheet) return;
+  const data = sheet.getDataRange().getValues();
+
+  for (let r = 1; r < data.length; r++) {
+    const row = data[r];
+    const taskId = row[PROJECT_COLS.Google_Task_ID - 1];
+    const listId = row[PROJECT_COLS.Google_List_ID - 1];
+    if (!taskId || !listId) continue;
+
+    const status = String(row[PROJECT_COLS.Status - 1] || '').toLowerCase();
+    if (PROJECT_STATUS_DONE.includes(status) || PROJECT_STATUS_SKIP.includes(status)) continue;
+
+    try {
+      const task = Tasks.Tasks.get(listId, taskId);
+      if (task.status === 'completed') {
+        sheet.getRange(r + 1, PROJECT_COLS.Status).setValue('done');
+        sheet.getRange(r + 1, PROJECT_COLS.Completed_Date).setValue(
+          String(task.completed || new Date().toISOString()).substring(0, 10)
+        );
+        Logger.log(`Marked done from phone: "${row[PROJECT_COLS.Title - 1]}"`);
+      }
+    } catch (err) {
+      Logger.log(`Could not check completion for project task row ${r + 1}: ${err}`);
+    }
+  }
+}
+
+/** Entry point for the 5-min project-task trigger: push sheet changes out, then pull back
+ *  any completions. */
+function pollProjectTasks() {
+  pushProjectTasksToGoogle_();
+  pullProjectTaskCompletions_();
+}
+
+/** Edits to the Tasks tab push immediately rather than waiting for the next 5-min poll. */
+function onProjectTasksEdit(e) {
+  const sheet = e.range.getSheet();
+  if (sheet.getName() !== PROJECT_TAB_NAME) return;
+  if (e.range.getRow() === 1) return; // header row
+  pushProjectTasksToGoogle_();
 }
 
 // ===================================================================================
