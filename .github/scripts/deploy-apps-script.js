@@ -15,6 +15,7 @@
  * two tracked files into that set rather than overwriting it wholesale.
  *
  * First live run via service account: 2026-09-28.
+ * Retry after domain-wide delegation propagation: 2026-09-28.
  */
 
 const fs = require('fs');
