@@ -46,7 +46,15 @@ async function main() {
   const auth = new google.auth.JWT({
     email: key.client_email,
     key: key.private_key,
-    scopes: ['https://www.googleapis.com/auth/script.projects'],
+    // script.projects covers file/version edits; deployments.update needs the
+    // separate script.deployments scope, or it fails with
+    // ACCESS_TOKEN_SCOPE_INSUFFICIENT even though everything else succeeds.
+    // Both scopes must also be authorized (comma-separated) for this service
+    // account's Client ID in admin.google.com's Domain-wide Delegation settings.
+    scopes: [
+      'https://www.googleapis.com/auth/script.projects',
+      'https://www.googleapis.com/auth/script.deployments',
+    ],
     subject: 'brett@bmoremanagement.com',
   });
   await auth.authorize();
