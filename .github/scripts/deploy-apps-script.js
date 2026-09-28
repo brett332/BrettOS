@@ -13,6 +13,8 @@
  * file set. Code.gs (Brett's original setup script) is NOT tracked in
  * this repo, so we first fetch the project's current files and merge our
  * two tracked files into that set rather than overwriting it wholesale.
+ *
+ * First live run via service account: 2026-09-28.
  */
 
 const fs = require('fs');
