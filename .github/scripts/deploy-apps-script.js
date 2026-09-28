@@ -40,13 +40,17 @@ async function main() {
   }
   const key = JSON.parse(Buffer.from(keyB64, 'base64').toString('utf8'));
 
+  // The Apps Script API requires a real Workspace user identity, not a bare
+  // service account — so this impersonates Brett via domain-wide delegation
+  // (configured in the GCP console + admin.google.com, not here).
   const auth = new google.auth.JWT({
     email: key.client_email,
     key: key.private_key,
     scopes: ['https://www.googleapis.com/auth/script.projects'],
+    subject: 'brett@bmoremanagement.com',
   });
   await auth.authorize();
-  console.log(`Authenticated as ${key.client_email}`);
+  console.log(`Authenticated as ${key.client_email}, impersonating brett@bmoremanagement.com`);
 
   const script = google.script({ version: 'v1', auth });
 
