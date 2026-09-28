@@ -5,6 +5,8 @@ on:
     branches: [main]
     paths:
       - 'apps-script/tasks-sync/**'
+      - '.github/scripts/deploy-apps-script.js'
+      - '.github/workflows/deploy-tasks-sync.yml'
   workflow_dispatch: {}
 
 jobs:
@@ -19,29 +21,12 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Install clasp
-        run: npm install -g @google/clasp
+      - name: Install deploy dependencies
+        run: npm install googleapis
+        working-directory: .github/scripts
 
-      - name: Restore clasp credentials
-        run: |
-          # CLASP_CREDENTIALS_B64 is base64 of ~/.clasprc.json so that copy/paste
-          # into the GitHub Secrets UI can't corrupt the JSON with stray line
-          # breaks or whitespace (this is what broke the very first run: clasp
-          # failed with "Expected ',' or '}' after property value in JSON at
-          # position 631"). --ignore-garbage tolerates any stray whitespace
-          # picked up in copy/paste rather than hard-failing on it.
-          if [ -z "$CLASP_CREDENTIALS_B64" ]; then
-            echo "::error::CLASP_CREDENTIALS_B64 secret is empty or not set. In brett332/BrettOS -> Settings -> Secrets and variables -> Actions, add/update a secret named exactly CLASP_CREDENTIALS_B64 with the output of: base64 -w0 ~/.clasprc.json (run in Cloud Shell)." && exit 1
-          fi
-          echo "$CLASP_CREDENTIALS_B64" | base64 -d --ignore-garbage > "$HOME/.clasprc.json"
-          node -e "JSON.parse(require('fs').readFileSync(process.env.HOME + '/.clasprc.json', 'utf8'))" \
-            && echo "Credentials file is valid JSON." \
-            || (echo "::error::~/.clasprc.json is not valid JSON after decoding CLASP_CREDENTIALS_B64. Re-run 'base64 -w0 ~/.clasprc.json' in Cloud Shell, copy the ENTIRE single-line output, and replace the CLASP_CREDENTIALS_B64 secret value with it exactly (no extra quotes, no partial copy)." && exit 1)
+      - name: Deploy via Apps Script API (service account)
+        working-directory: .github/scripts
+        run: node deploy-apps-script.js
         env:
-          CLASP_CREDENTIALS_B64: ${{ secrets.CLASP_CREDENTIALS_B64 }}
-
-      - name: Push and deploy
-        working-directory: apps-script/tasks-sync
-        run: |
-          clasp push --force
-          clasp deploy -i AKfycbwboTdUJ3datXm7R2XTn3gyaYPxhEWbz7iIPyAZJvO-b3RaOo8zueFZqQGxTT6loPGsug -d "auto-deploy $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          APPSSCRIPT_SA_KEY_B64: ${{ secrets.APPSSCRIPT_SA_KEY_B64 }}
