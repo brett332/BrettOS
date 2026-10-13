@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<base target="_top">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Waynesboro Sales</title>
+<style>
+  :root {
+    --bg: #faf6ee; --card: #ffffff; --ink: #1f2a24; --muted: #5d6b63; --line: #d9d2c3;
+    --green: #1f6b3a; --green-ink: #ffffff; --sel: #e3f1e7; --warn: #a33a1d; --warn-bg: #fbe9e3;
+  }
+  * { box-sizing: border-box; }
+  html { font-size: 20px; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; line-height: 1.35; }
+  .wrap { max-width: 640px; margin: 0 auto; padding: 16px 16px 60px; }
+  h1 { font-size: 1.5rem; margin: 6px 0 2px; }
+  h2 { font-size: 1.15rem; margin: 26px 0 10px; }
+  .sub { color: var(--muted); font-size: .85rem; margin: 0 0 8px; }
+  .step { display: inline-flex; align-items: center; justify-content: center; width: 1.6em; height: 1.6em;
+    border-radius: 50%; background: var(--green); color: #fff; font-size: .8rem; margin-right: 8px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  @media (max-width: 380px) { .grid { grid-template-columns: 1fr; } }
+  .tile { background: var(--card); border: 2px solid var(--line); border-radius: 14px; padding: 14px 12px;
+    text-align: left; font: inherit; color: inherit; cursor: pointer; min-height: 84px; }
+  .tile .name { font-weight: 650; display: block; }
+  .tile .have { color: var(--muted); font-size: .85rem; display: block; margin-top: 4px; }
+  .tile[aria-pressed="true"] { border-color: var(--green); background: var(--sel); box-shadow: 0 0 0 2px var(--green) inset; }
+  .panel { background: var(--card); border: 2px solid var(--line); border-radius: 14px; padding: 16px; margin-top: 14px; }
+  .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 10px 0; }
+  .row label { font-weight: 600; }
+  .stepper { display: flex; align-items: center; gap: 10px; }
+  .stepper button { width: 54px; height: 54px; border-radius: 50%; border: 2px solid var(--green); background: #fff;
+    color: var(--green); font-size: 1.6rem; line-height: 1; cursor: pointer; }
+  .stepper .n { min-width: 2.2ch; text-align: center; font-size: 1.6rem; font-weight: 700; }
+  .money { display: flex; align-items: center; gap: 6px; font-size: 1.3rem; }
+  .money input { width: 5.5em; font: inherit; font-size: 1.3rem; padding: 10px; border: 2px solid var(--line); border-radius: 10px; }
+  .total { font-size: 1.25rem; font-weight: 700; text-align: right; margin-top: 4px; }
+  .go { display: block; width: 100%; margin-top: 16px; padding: 18px; font: inherit; font-size: 1.25rem; font-weight: 700;
+    background: var(--green); color: var(--green-ink); border: 0; border-radius: 14px; cursor: pointer; }
+  .go[disabled] { opacity: .45; cursor: default; }
+  .msg { margin-top: 14px; padding: 14px; border-radius: 12px; font-weight: 600; }
+  .ok { background: var(--sel); border: 2px solid var(--green); }
+  .bad { background: var(--warn-bg); border: 2px solid var(--warn); color: #5a1d0a; }
+  .sale { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px; margin-bottom: 8px;
+    display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+  .sale .what { font-weight: 600; }
+  .sale .when { color: var(--muted); font-size: .8rem; }
+  .sale.gone .what { text-decoration: line-through; color: var(--muted); }
+  .undo { font: inherit; font-size: .85rem; padding: 10px 14px; border-radius: 10px; border: 2px solid var(--warn);
+    background: #fff; color: var(--warn); cursor: pointer; white-space: nowrap; }
+  .pin input { width: 100%; font: inherit; font-size: 1.6rem; letter-spacing: .3em; text-align: center; padding: 12px;
+    border: 2px solid var(--line); border-radius: 12px; }
+  .empty { color: var(--muted); }
+  .link { background: none; border: 0; color: var(--green); font: inherit; text-decoration: underline; cursor: pointer; padding: 6px 0; }
+  .hide { display: none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Waynesboro Sales</h1>
+  <p class="sub">Tap what you sold. The stock count updates by itself.</p>
+
+  <div id="pinBox" class="panel pin hide">
+    <div style="font-weight:600;margin-bottom:8px">Enter the 4-number code Brett gave you</div>
+    <input id="pin" inputmode="numeric" autocomplete="off" maxlength="8" aria-label="Code">
+    <button class="go" id="pinGo">Open</button>
+    <div id="pinMsg" class="msg bad hide"></div>
+  </div>
+
+  <div id="main" class="hide">
+    <h2><span class="step">1</span>What did you sell?</h2>
+    <div id="tiles" class="grid"></div>
+    <p id="none" class="empty hide">Nothing is listed as on the shelf right now. If that is wrong, please tell Brett.</p>
+
+    <div id="form" class="panel hide">
+      <div style="font-weight:700;font-size:1.1rem" id="picked"></div>
+      <h2 style="margin-top:14px"><span class="step">2</span>How many?</h2>
+      <div class="row">
+        <div class="stepper">
+          <button id="minus" aria-label="One less">&minus;</button>
+          <span class="n" id="qty">1</span>
+          <button id="plus" aria-label="One more">+</button>
+        </div>
+        <div class="sub" id="have"></div>
+      </div>
+      <h2 style="margin-top:14px"><span class="step">3</span>Price for each</h2>
+      <div class="row">
+        <div class="money">$<input id="price" inputmode="decimal" aria-label="Price for each"></div>
+        <div class="sub">Change it if you sold for a different price.</div>
+      </div>
+      <div class="total" id="total"></div>
+      <button class="go" id="go">Record this sale</button>
+    </div>
+
+    <div id="msg" class="msg hide" role="status"></div>
+
+    <h2>Recent sales</h2>
+    <div id="recent"></div>
+    <button class="link" id="refresh">Refresh</button>
+    <button class="link" id="forget">Change code</button>
+  </div>
+</div>
+
+<script>
+(function () {
+  var pin = '', state = { products: [], recent: [] }, sel = null, qty = 1, busy = false;
+  var $ = function (id) { return document.getElementById(id); };
+  function store(k, v) { try { if (v === undefined) return localStorage.getItem(k); if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) {} return null; }
+  function money(n) { return '$' + (Math.round(n * 100) / 100).toFixed(2).replace(/\.00$/, ''); }
+  function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  function show(el, on) { el.classList.toggle('hide', !on); }
+  function say(text, good) { var m = $('msg'); m.className = 'msg ' + (good ? 'ok' : 'bad'); m.textContent = text; show(m, true); m.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+  function when(iso) {
+    var d = new Date(iso); if (isNaN(d)) return '';
+    return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }) + ' ' +
+      d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+  }
+  function fail(err) {
+    busy = false; $('go').disabled = false;
+    var t = (err && err.message) ? err.message : String(err);
+    if (/WRONG_PIN/.test(t)) { store('wbpin', null); pin = ''; show($('main'), false); show($('pinBox'), true); $('pinMsg').textContent = 'That code did not work. Please try again.'; show($('pinMsg'), true); return; }
+    say(t.replace(/^Error:\s*/, ''), false);
+  }
+
+  function render() {
+    var tiles = $('tiles'); tiles.innerHTML = '';
+    state.products.forEach(function (p) {
+      var b = document.createElement('button');
+      b.className = 'tile'; b.setAttribute('aria-pressed', sel && sel.id === p.id ? 'true' : 'false');
+      b.innerHTML = '<span class="name">' + esc(p.name) + '</span><span class="have">' + p.onHand + ' on the shelf</span>';
+      b.onclick = function () { sel = p; qty = 1; $('price').value = p.price ? String(p.price) : ''; show($('msg'), false); render(); $('form').scrollIntoView({ behavior: 'smooth', block: 'nearest' }); };
+      tiles.appendChild(b);
+    });
+    show($('none'), state.products.length === 0);
+    if (sel) { var still = state.products.filter(function (p) { return p.id === sel.id; })[0]; if (!still) sel = null; else sel = still; }
+    show($('form'), !!sel);
+    if (sel) {
+      if (qty > sel.onHand) qty = sel.onHand;
+      $('picked').textContent = sel.name;
+      $('qty').textContent = qty;
+      $('have').textContent = sel.onHand + ' on the shelf';
+      updateTotal();
+    }
+    var r = $('recent'); r.innerHTML = '';
+    if (!state.recent.length) { r.innerHTML = '<p class="empty">No sales yet.</p>'; }
+    state.recent.forEach(function (s) {
+      var d = document.createElement('div'); d.className = 'sale' + (s.undone ? ' gone' : '');
+      var amt = s.price ? ' &middot; ' + money(s.qty * s.price) : '';
+      d.innerHTML = '<div><div class="what">' + s.qty + ' &times; ' + esc(s.product) + amt + '</div><div class="when">' + esc(when(s.at)) + (s.undone ? ' &middot; undone' : '') + '</div></div>';
+      if (!s.undone && s.status === 'OK') {
+        var u = document.createElement('button'); u.className = 'undo'; u.textContent = 'Undo';
+        u.onclick = function () { if (busy) return; if (!u.dataset.sure) { u.dataset.sure = '1'; u.textContent = 'Tap again to undo'; setTimeout(function () { u.dataset.sure = ''; u.textContent = 'Undo'; }, 4000); return; } busy = true; u.disabled = true;
+          google.script.run.withSuccessHandler(function (res) { busy = false; state = res.state; render(); say(res.message, res.ok); }).withFailureHandler(fail).wbUndoSale(pin, s.row); };
+        d.appendChild(u);
+      }
+      r.appendChild(d);
+    });
+  }
+  function updateTotal() { var p = parseFloat($('price').value); $('total').textContent = isFinite(p) ? 'Total: ' + money(p * qty) : ''; }
+
+  function load(first) {
+    google.script.run.withSuccessHandler(function (s) {
+      state = s; store('wbpin', pin); show($('pinBox'), false); show($('main'), true); render();
+    }).withFailureHandler(fail).wbGetState(pin);
+  }
+
+  $('minus').onclick = function () { if (qty > 1) { qty--; $('qty').textContent = qty; updateTotal(); } };
+  $('plus').onclick = function () { if (sel && qty < sel.onHand) { qty++; $('qty').textContent = qty; updateTotal(); } };
+  $('price').oninput = updateTotal;
+  $('go').onclick = function () {
+    if (busy || !sel) return;
+    var p = parseFloat($('price').value);
+    if (!isFinite(p) || p < 0) { say('Please type the price for each one.', false); return; }
+    busy = true; $('go').disabled = true; $('go').textContent = 'Saving...';
+    google.script.run.withSuccessHandler(function (res) {
+      busy = false; $('go').disabled = false; $('go').textContent = 'Record this sale';
+      state = res.state;
+      if (res.ok) { sel = null; qty = 1; }
+      render(); say(res.ok ? res.message + ' ' + res.left + ' left on the shelf.' : res.message, res.ok);
+    }).withFailureHandler(function (e) { $('go').textContent = 'Record this sale'; fail(e); }).wbRecordSale(pin, sel.id, qty, p);
+  };
+  $('refresh').onclick = function () { load(); };
+  $('forget').onclick = function () { store('wbpin', null); pin = ''; $('pin').value = ''; show($('main'), false); show($('pinBox'), true); };
+  $('pinGo').onclick = function () { pin = $('pin').value.trim(); if (!pin) return; show($('pinMsg'), false); load(true); };
+  $('pin').onkeydown = function (e) { if (e.key === 'Enter') $('pinGo').click(); };
+
+  var saved = store('wbpin');
+  if (saved) { pin = saved; load(true); } else { show($('pinBox'), true); }
+})();
+</script>
+</body>
+</html>
