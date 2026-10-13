@@ -1,3 +1,4 @@
+// ─────────────────────────────────────────────────────────────────────────────
 // BarrelCo entry-sheet processor.
 //
 // Brett (Entry tab) and his mother (Waynesboro Sales sheet) type manual stock
@@ -8,12 +9,13 @@
 //   Status PROCESSING  -> claimed (never re-applied; flagged CHECK if stuck >10 min)
 //   Status OK          -> applied
 //   Status ERROR: ...  -> rejected BEFORE anything was written (safe to fix and re-enter)
-//   Status CHECK: ...  -> something may be half-applied - look at Inventory/History
+//   Status CHECK: ...  -> something may be half-applied — look at Inventory/History
 //
 // Columns are found by HEADER NAME so both sheets share this code:
 //   Action | Location | Product | Qty | To Location | Price | Note | Status | Result | Processed At
 // Status, Result, Processed At must be adjacent, in that order.
 // Counts never go below zero. Every problem lands in the row Status and the Debug tab.
+// ─────────────────────────────────────────────────────────────────────────────
 
 var BARREL = {
   SHEET_ID: '1VVsavQV5tdk14BrtqDU1EvCg9R6-SlrJetRqNpC6z6s',
@@ -34,6 +36,7 @@ var ACTION_ALIASES = {
 function norm_(s) { return String(s === undefined || s === null ? '' : s).trim().toLowerCase(); }
 function cell_(r, i) { return (i >= 0 && r && r[i] !== undefined && r[i] !== null) ? String(r[i]).trim() : ''; }
 
+// Whole tab as display strings (same as the Sheets API would give). null if tab missing.
 function readTab_(ss, tab) {
   var sh = ss.getSheetByName(tab);
   if (!sh) return null;
@@ -42,6 +45,8 @@ function readTab_(ss, tab) {
   return sh.getRange(1, 1, lr, lc).getDisplayValues();
 }
 
+// Write one row segment. Strings are forced to plain text (so ISO timestamps stay
+// strings, like the Worker writes them); numbers stay numbers.
 function putCells_(sh, row, col, values) {
   var rng = sh.getRange(row, col, 1, values.length);
   rng.setNumberFormats([values.map(function (v) {
@@ -56,6 +61,7 @@ function appendRow_(ss, tab, values) {
   putCells_(sh, sh.getLastRow() + 1, 1, values);
 }
 
+// Debug-tab log, but not the same message again within an hour.
 function logOnce_(ss, app, msg) {
   msg = String(msg).slice(0, 900);
   try { Logger.log('[' + app + '] ' + msg); } catch (_) {}
@@ -90,6 +96,10 @@ function runBarrelEntry_(ctx) {
       });
     }
   } catch (e) { logOnce_(ss, 'entry', 'Config / Waynesboro sheet unreadable: ' + e.message); }
+  if (ss.getSheetByName('Waynesboro_Sales')) {
+    targets.push({ ss: ss, tab: 'Waynesboro_Sales', label: 'waynesboro-web', allowed: ['Sold', 'Received'],
+      defaults: { location: cfg.WaynesboroLocationId || 'loc_waynesboro_va' } });
+  }
 
   var report = [];
   targets.forEach(function (t) {
@@ -128,6 +138,7 @@ function processEntrySheet_(main, t) {
 
   var writeStatus = function (i, status, result, at) { putCells_(sh, i + 1, C.status + 1, [status, result, at]); };
 
+  // 1) find work; flag claims that never finished
   var work = [];
   for (var i = 1; i < values.length; i++) {
     var r = values[i] || [];
@@ -147,6 +158,7 @@ function processEntrySheet_(main, t) {
   }
   if (!work.length) return res;
 
+  // 2) lookups
   var catalog = readTab_(main, 'Catalog') || [];
   var locations = readTab_(main, 'Locations') || [];
   var cH = (catalog[0] || []).map(norm_), lH = (locations[0] || []).map(norm_);
@@ -174,6 +186,7 @@ function processEntrySheet_(main, t) {
     return null;
   };
 
+  // 3) process rows one at a time
   work.slice(0, BARREL.MAX_PER_RUN).forEach(function (i) {
     var r = values[i] || [];
     var rowNo = i + 1;
@@ -213,6 +226,7 @@ function processEntrySheet_(main, t) {
       price = (isFinite(p) && p >= 0) ? Math.round(p * 100) / 100 : 0;
     }
 
+    // claim the row so it can never be applied twice
     try { writeStatus(i, 'PROCESSING', '', new Date().toISOString()); }
     catch (e) { logOnce_(main, 'entry', t.label + ' row ' + rowNo + ': could not claim row (nothing applied): ' + e.message); return; }
 
@@ -232,7 +246,7 @@ function processEntrySheet_(main, t) {
       var next, toCur = 0, toNext = 0;
       if (action === 'Received') next = cur + qty;
       else if (action === 'Set count') next = qty;
-      else {
+      else {                                          // Sold / Remove / Transfer: never go below zero
         if (qty > cur) {
           writeStatus(i, 'ERROR: only ' + cur + ' of ' + prod.name + ' at ' + loc.name + ", can't take out " + qty + ' — fix the count with "Set count" first', '', new Date().toISOString());
           res.errors++; return;
@@ -272,6 +286,7 @@ function processEntrySheet_(main, t) {
         result = loc.name + ': ' + cur + ' → ' + next + '; ' + toLoc.name + ': ' + toCur + ' → ' + toNext;
       }
 
+      // confirm the counts landed (fresh read from the sheet)
       SpreadsheetApp.flush();
       var after = readTab_(main, 'Inventory') || [];
       var got = function (lid) {
@@ -284,6 +299,8 @@ function processEntrySheet_(main, t) {
       if (got(loc.id) !== next) bad.push(loc.name + ' shows ' + got(loc.id) + ', expected ' + next);
       if (toLoc && got(toLoc.id) !== toNext) bad.push(toLoc.name + ' shows ' + got(toLoc.id) + ', expected ' + toNext);
 
+      // Data is fully written here. If only the status write fails the row stays
+      // PROCESSING (never re-applied) and is flagged as stuck after 10 minutes.
       var finish = function (st) {
         try { writeStatus(i, st, result, ts); return true; }
         catch (e) { logOnce_(main, 'entry', t.label + ' row ' + rowNo + ': applied but could not write status "' + st + '": ' + e.message); return false; }
@@ -297,7 +314,7 @@ function processEntrySheet_(main, t) {
     } catch (e) {
       var st = (wrote ? 'CHECK: partly applied — ' : 'ERROR: ') + String(e.message).slice(0, 200);
       logOnce_(main, 'entry', t.label + ' row ' + rowNo + ': ' + st);
-      try { writeStatus(i, st, '', new Date().toISOString()); } catch (_) { }
+      try { writeStatus(i, st, '', new Date().toISOString()); } catch (_) { /* stays PROCESSING; flagged stuck later */ }
       if (wrote) res.checks++; else res.errors++;
     }
   });
