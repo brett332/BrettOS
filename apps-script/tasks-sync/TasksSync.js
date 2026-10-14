@@ -674,6 +674,182 @@ function pollProjectTasks() {
   pullProjectTaskCompletions_();
 }
 
+// ===================================================================================
+// HUB IMPROVEMENTS APPLIER (Oct 14 2026) — keeps the "RidgeCo Hub Improvements" Google Tasks list in step with the
+// RidgeCo Hub's Optimizer queue.
+//   The Hub (a Cloudflare Worker, run by its Apps Script scheduler every Monday + Thursday) pulls new items from that
+//   list into its build queue and keeps a ledger tab (Hub_Improvements, in the Hub sheet) of where each one stands:
+//   pulled -> done. This script is the only thing that changes Google Tasks, because only it has the Tasks service:
+//     pulled / building -> adds ONE note line to the task:  "[Hub] In progress: ..."   (the task stays open)
+//     done              -> completes the task and sets the note line to  "[Hub] Built <date> (PR #n)"
+//     dropped           -> adds "[Hub] Dropped ..." and leaves the task open (Brett decides)
+//   The Hub never writes this sheet (task-linking decision #1), and this script never writes the Hub sheet. Instead:
+//     Hub_Ledger_View  = an IMPORTRANGE of the Hub ledger (read-only mirror; one-time "Allow access" tap, see below)
+//     Hub_Applied      = what this script has done (Task_ID, Applied_Status, Applied_At, Error, Title); the Hub reads it
+//   NOTHING FAILS SILENTLY: any problem is written to Hub_Applied.Error (the Hub reports it as a failed job), logged, and
+//   emailed to Brett (at most once per 20h per distinct problem). If the Hub_Ledger_View mirror is not allowed to load,
+//   that is reported the same way.
+//   ONE-TIME: open this sheet, go to the Hub_Ledger_View tab, tap cell A1 and choose "Allow access".
+// ===================================================================================
+const HUB_LEDGER_SHEET_ID_ = '1KggRJBeJg6WDElisEQmAEsmB0hXtoNBIYWbOMFCd4S4';   // the RidgeCo Hub sheet (Hub_Improvements tab)
+const HUB_VIEW_TAB = 'Hub_Ledger_View';
+const HUB_APPLIED_TAB = 'Hub_Applied';
+const HUB_APPLIED_COLS = ['Task_ID', 'Applied_Status', 'Applied_At', 'Error', 'Title'];
+const HUB_LINE_PREFIX = '[Hub] ';
+const HUB_TRACKED = ['pulled', 'building', 'done', 'dropped'];
+const HUB_MAX_PER_RUN = 25;
+const HUB_ALERT_THROTTLE_MS = 20 * 3600 * 1000;
+const HUB_LIST_TITLE = 'RidgeCo Hub Improvements';
+
+function ensureHubTabs_() {
+  const ss = SpreadsheetApp.getActive();
+  let view = ss.getSheetByName(HUB_VIEW_TAB);
+  if (!view) {
+    view = ss.insertSheet(HUB_VIEW_TAB);
+    view.getRange('A1').setFormula('=IMPORTRANGE("' + HUB_LEDGER_SHEET_ID_ + '","Hub_Improvements!A:Z")');
+  }
+  let applied = ss.getSheetByName(HUB_APPLIED_TAB);
+  if (!applied) {
+    applied = ss.insertSheet(HUB_APPLIED_TAB);
+    applied.getRange(1, 1, 1, HUB_APPLIED_COLS.length).setValues([HUB_APPLIED_COLS]);
+    applied.setFrozenRows(1);
+  }
+  return { view: view, applied: applied };
+}
+
+/** PURE — the one "[Hub] ..." note line for a ledger row. */
+function hubNoteLine_(row, tz) {
+  const status = String(row.Status || '').toLowerCase();
+  const when = row.Status_Changed_At ? new Date(row.Status_Changed_At) : new Date();
+  const date = isNaN(when.getTime()) ? '' : Utilities.formatDate(when, tz || 'America/New_York', 'MMM d');
+  if (status === 'pulled') return HUB_LINE_PREFIX + 'In progress: in the Optimizer queue' + (row.Queue_ID ? ' as #' + row.Queue_ID : '') + (date ? ' since ' + date : '') + (/check before building|may overlap|same as/i.test(row.Note || '') ? ' (' + String(row.Note).trim().slice(0, 140) + ')' : '');
+  if (status === 'building') return HUB_LINE_PREFIX + 'In progress: ' + (row.PR ? 'PR #' + row.PR + ' open, awaiting merge' : 'being built') + (date ? ' (' + date + ')' : '');
+  if (status === 'done') return HUB_LINE_PREFIX + 'Built' + (date ? ' ' + date : '') + (row.PR ? ' (PR #' + row.PR + ')' : '');
+  if (status === 'dropped') return HUB_LINE_PREFIX + 'Dropped from the Optimizer queue' + (date ? ' ' + date : '') + '. Left open: your call.';
+  return '';
+}
+
+/** PURE — notes with any previous "[Hub] ..." line replaced by `line`. */
+function hubMergeNotes_(notes, line) {
+  const kept = String(notes || '').split('\n').filter(function (l) { return l.indexOf(HUB_LINE_PREFIX) !== 0; }).join('\n').replace(/\s+$/, '');
+  return kept ? kept + '\n\n' + line : line;
+}
+
+/** PURE — the ledger rows that still need applying: tracked status, and Hub_Applied does not already record that status without error. */
+function hubRowsToApply_(ledgerRows, appliedRows) {
+  const done = {};
+  (appliedRows || []).forEach(function (a) { if (a.Task_ID) done[String(a.Task_ID)] = a; });
+  return (ledgerRows || []).filter(function (r) {
+    const st = String(r.Status || '').toLowerCase();
+    if (!r.Task_ID || HUB_TRACKED.indexOf(st) < 0) return false;
+    const a = done[String(r.Task_ID)];
+    return !(a && String(a.Applied_Status || '') === st && !a.Error);
+  });
+}
+
+function sheetObjects_(values) {
+  if (!values || values.length < 2) return [];
+  const hdr = values[0].map(String);
+  return values.slice(1).map(function (r) { const o = {}; hdr.forEach(function (h, i) { o[h] = r[i] === undefined ? '' : r[i]; }); return o; })
+    .filter(function (o) { return Object.keys(o).some(function (k) { return o[k] !== '' && o[k] !== null; }); });
+}
+
+/** Writes (or updates) the Hub_Applied row for a task. `appliedStatus` null = keep what was there (a failed attempt must not look applied). */
+function recordHubApplied_(appliedSheet, taskId, appliedStatus, err, title) {
+  const data = appliedSheet.getDataRange().getValues();
+  let rowIdx = -1;
+  for (let r = 1; r < data.length; r++) if (String(data[r][0]) === String(taskId)) { rowIdx = r + 1; break; }
+  const prev = rowIdx > 0 ? data[rowIdx - 1] : null;
+  const status = appliedStatus !== null ? appliedStatus : (prev ? prev[1] : '');
+  const at = appliedStatus !== null ? new Date().toISOString() : (prev ? prev[2] : '');
+  const vals = [[String(taskId), status, at, err ? String(err).slice(0, 300) : '', String(title || '').slice(0, 120)]];
+  if (rowIdx > 0) appliedSheet.getRange(rowIdx, 1, 1, HUB_APPLIED_COLS.length).setValues(vals);
+  else appliedSheet.appendRow(vals[0]);
+}
+
+/** Finds the Google Task: the ledger's list first, then the list the Tasks_Sync mirror currently shows it in, then the named list. */
+function findHubTask_(row) {
+  const candidates = [];
+  if (row.List_ID) candidates.push(String(row.List_ID));
+  const ss = SpreadsheetApp.getActive(), mirror = ss.getSheetByName(TAB_NAME);
+  if (mirror) {
+    const m = mirror.getDataRange().getValues();
+    for (let r = 1; r < m.length; r++) if (String(m[r][0]) === String(row.Task_ID) && m[r][7]) { candidates.push(String(m[r][7])); break; }
+  }
+  const byTitle = listTaskListsByTitle_();
+  if (byTitle[HUB_LIST_TITLE]) candidates.push(byTitle[HUB_LIST_TITLE]);
+  const tried = {};
+  for (let i = 0; i < candidates.length; i++) {
+    if (tried[candidates[i]]) continue;
+    tried[candidates[i]] = true;
+    try { const task = Tasks.Tasks.get(candidates[i], String(row.Task_ID)); if (task && task.id) return { listId: candidates[i], task: task }; } catch (e) { /* try the next list */ }
+  }
+  return null;
+}
+
+function notifyHubProblem_(problems) {
+  if (!problems.length) return;
+  const text = problems.join('\n');
+  Logger.log('Hub Improvements applier problem(s):\n' + text);
+  try {
+    const props = PropertiesService.getScriptProperties();
+    const sig = text.slice(0, 500), lastSig = props.getProperty('HUB_ALERT_SIG'), lastAt = Number(props.getProperty('HUB_ALERT_AT') || 0);
+    if (sig === lastSig && Date.now() - lastAt < HUB_ALERT_THROTTLE_MS) return;
+    GmailApp.sendEmail(Session.getEffectiveUser().getEmail(), '[BrettOS] Hub Improvements -> Google Tasks problem',
+      'The Hub Improvements applier could not update Google Tasks:\n\n' + text + '\n\nIt retries every 5 minutes. If the first line says Hub_Ledger_View is not loading: open the BrettOS sheet, go to the Hub_Ledger_View tab, tap cell A1 and choose "Allow access".');
+    props.setProperty('HUB_ALERT_SIG', sig); props.setProperty('HUB_ALERT_AT', String(Date.now()));
+  } catch (err) { Logger.log('Could not send the Hub applier alert email: ' + err); }
+}
+
+/** Runs on every poll (see pollAll). Returns { applied, failed, problems }; never throws. */
+function applyHubImprovements_() {
+  const problems = [];
+  let applied = 0, failed = 0;
+  const lock = LockService.getScriptLock();
+  try {
+    if (!lock.tryLock(20000)) { Logger.log('Hub applier: another run holds the lock; will retry next poll.'); return { applied: 0, failed: 0, problems: [], skipped: 'locked' }; }
+    const tabs = ensureHubTabs_();
+    const vals = tabs.view.getDataRange().getValues();
+    const hdr = (vals[0] || []).map(String);
+    if (hdr.indexOf('Task_ID') < 0 || hdr.indexOf('Status') < 0) {
+      problems.push('Hub_Ledger_View is not loading the Hub ledger (A1 shows "' + String(vals[0] && vals[0][0] || '(empty)').slice(0, 60) + '"). Open the BrettOS sheet, go to the Hub_Ledger_View tab, tap A1 and choose "Allow access".');
+      notifyHubProblem_(problems);
+      return { applied: 0, failed: 0, problems: problems };
+    }
+    const todo = hubRowsToApply_(sheetObjects_(vals), sheetObjects_(tabs.applied.getDataRange().getValues())).slice(0, HUB_MAX_PER_RUN);
+    todo.forEach(function (row) {
+      const status = String(row.Status).toLowerCase();
+      try {
+        const hit = findHubTask_(row);
+        if (!hit) throw new Error('Google Task ' + row.Task_ID + ' not found (deleted?)');
+        const patch = { notes: hubMergeNotes_(hit.task.notes, hubNoteLine_(row)) };
+        if (status === 'done') patch.status = 'completed';
+        Tasks.Tasks.patch(patch, hit.listId, hit.task.id);
+        recordHubApplied_(tabs.applied, row.Task_ID, status, '', row.Title);
+        applied++;
+      } catch (e) {
+        failed++;
+        const msg = '"' + String(row.Title || row.Task_ID).slice(0, 60) + '" (' + status + '): ' + String(e && e.message || e).slice(0, 200);
+        problems.push(msg);
+        try { recordHubApplied_(tabs.applied, row.Task_ID, null, msg, row.Title); } catch (e2) { Logger.log('Could not record the applier error: ' + e2); }
+      }
+    });
+    if (problems.length) notifyHubProblem_(problems);
+    if (applied) Logger.log('Hub Improvements applier: updated ' + applied + ' Google Task(s).');
+    return { applied: applied, failed: failed, problems: problems };
+  } catch (err) {
+    const msg = 'applier crashed: ' + String(err && err.message || err).slice(0, 250);
+    Logger.log(msg);
+    notifyHubProblem_([msg]);
+    return { applied: applied, failed: failed, problems: [msg] };
+  } finally {
+    try { lock.releaseLock(); } catch (e) { /* not held */ }
+  }
+}
+
+/** Manual run from the Apps Script editor (same as one poll's worth). */
+function applyHubImprovements() { return applyHubImprovements_(); }
+
 /** Edits to the Tasks tab push immediately rather than waiting for the next 5-min poll. */
 function onProjectTasksEdit(e) {
   const sheet = e.range.getSheet();
