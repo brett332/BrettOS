@@ -339,6 +339,9 @@ function routeInboxTasks_() {
 function pollAll() {
   routeInboxTasks_();
   syncTasksToSheet();
+  // RidgeCo Hub Improvements -> Google Tasks (Oct 14 2026). Reports its own problems (Hub_Applied tab + email);
+  // wrapped so a failure here can never stop the sync above.
+  try { applyHubImprovements_(); } catch (err) { Logger.log('applyHubImprovements_ failed: ' + err); }
 }
 
 /** Tasks -> Sheet, across every non-excluded list. Also callable manually. */
